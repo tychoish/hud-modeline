@@ -460,3 +460,14 @@ not a flag-toggling command."
         (should-not (memq #'hud-modeline--on-theme-enable enable-theme-functions))
         (should-not (memq #'hud-modeline--on-make-frame after-make-frame-functions)))
     (hud-modeline-mode -1)))
+
+(ert-deftest hud-modeline--delight-specs-configured ()
+  "`hud-modeline-mode` configures `delight' when enabled."
+  (let ((hud-modeline-delight-specs '((emacs-lisp-mode "EL" :major))))
+    (unwind-protect
+        (progn
+          (hud-modeline-mode 1)
+          (with-temp-buffer
+            (emacs-lisp-mode)
+            (should (equal "EL" (hud-modeline--major-mode)))))
+      (hud-modeline-mode -1))))

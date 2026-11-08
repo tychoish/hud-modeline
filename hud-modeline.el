@@ -98,6 +98,59 @@
   :type 'boolean
   :group 'hud-modeline)
 
+(defcustom hud-modeline-delight-specs
+  '((fundamental-mode "fun" simple)
+    (abbrev-mode "abb")
+    (emacs-lisp-mode ("el" (lexical-binding ":l" ":d")) elisp-mode)
+    (lisp-interaction-mode "lisp" elisp-mode)
+    (sh-mode "sh" sh-script)
+    (org-mode "org" org-mode)
+    (org-agenda-mode "agenda" org-agenda)
+    (rst-mode "rst" rst-mode)
+    (markdown-mode "mdwn")
+    (emojify-mode nil)
+    (nerd-icons-dired-mode nil nerd-icons-dired)
+    (nerd-icons-xref-mode nil nerd-icons-xref)
+    (nerd-icons-completion-mode nil nerd-icons-completion)
+    (builder-mode "")
+    (projectile-mode nil projectile)
+    (eglot--managed-mode nil eglot)
+    (eldoc-mode nil eldoc)
+    (telega-chat-auto-fill-mode nil)
+    (anzu-mode " az" anzu)
+    (flyspell-mode " fs" flyspell)
+    (flycheck-mode " fc" flycheck)
+    (visual-line-mode " wr" simple)
+    (auto-fill-function " afm" simple)
+    (overwrite-mode " ovm" simple)
+    (refill-mode " rf" refill)
+    (auto-revert-mode nil autorevert)
+    (async-bytecomp-package-mode "" async-bytecomp)
+    (dired-async-mode "" dired-async)
+    (agent-shell-completion-mode nil agent-shell-completion)
+    (agent-shell-ui-mode nil agent-shell-ui)
+    (go-ts-mode "go.ts")
+    (go-mod-ts-mode "go.mod.ts")
+    (go-mode "go")
+    (rust-mode "rs")
+    (rustic-mode "rs(x)")
+    (python-ts-mode "py.ts")
+    (python-mode "py")
+    (lisp-mode "lisp")
+    (slime-mode "sl")
+    (slime-autodoc-mode nil)
+    (minaid-mode nil minaid)
+    (overmark-global-mode nil)
+    (overmark-mode nil)
+    (denote-sequence-hierarchy-mode "Hierarchy" denote-sequence)
+    (outline-minor-mode nil outline)
+    (cursor-sensor-mode nil cursor-sensor)
+    (agent-shell-notifications-mode nil agent-shell-notifications)
+    (terraform-mode "tf" terraform-mode))
+  "List of specifications passed to `delight' when `hud-modeline-mode' is active."
+  :type '(repeat sexp)
+  :group 'hud-modeline)
+
 ;;;###autoload
 (defun turn-on-hud-modeline-show-buffer-size ()
   "Enable `hud-modeline-show-buffer-size'."
@@ -904,6 +957,8 @@ annotations show [on]/[off], name, and description."
   (if hud-modeline-mode
       (progn
         (require 'delight)
+        (when (and (featurep 'delight) hud-modeline-delight-specs)
+          (delight hud-modeline-delight-specs))
         (setq hud-modeline--saved-format (default-value 'mode-line-format))
         (setq-default mode-line-format hud-modeline-format)
         (hud-modeline--suppress-underlines)
@@ -923,6 +978,10 @@ annotations show [on]/[off], name, and description."
       (hud-modeline--restore-boxes))
     (hud-modeline--restore-underlines)
     (setq-default mode-line-format hud-modeline--saved-format)))
+
+(with-eval-after-load 'delight
+  (when hud-modeline-delight-specs
+    (delight hud-modeline-delight-specs)))
 
 (provide 'hud-modeline)
 ;;; hud-modeline.el ends here
