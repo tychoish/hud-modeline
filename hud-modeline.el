@@ -353,8 +353,13 @@ Replaces any previously registered action for KEY."
     (setf (map-elt hud-modeline--action-keymaps key) map)))
 
 (defun hud-modeline--action-map (key)
-  "Return the cached mouse-1 keymap for segment KEY, or nil."
-  (map-elt hud-modeline--action-keymaps key))
+  "Return the cached mouse-1 keymap for segment KEY, or a default map."
+  (or (map-elt hud-modeline--action-keymaps key)
+      (let ((cmd (pcase key
+                   ('instance (when (fboundp 'sprite-list-menu) 'sprite-list-menu))
+                   ('projectile (when (fboundp 'projectile-dispatch) 'projectile-dispatch)))))
+        (when cmd
+          (hud-modeline-set-segment-action key cmd)))))
 
 (defun hud-modeline--register-segment (var key segment place-after place-before)
   "Insert KEY/SEGMENT into VAR at PLACE-AFTER or PLACE-BEFORE.
@@ -752,12 +757,6 @@ tooltip text.  Clicking with mouse-1 raises the *Backtrace* buffer via
                                     "debug-on-quit active\nmouse-1: raise *Backtrace*"))))))
          (concat (string-join parts " ") " ")))
 
-;; Default actions for optional segments when their packages are present.
-(with-eval-after-load 'sprite-list
-  (hud-modeline-set-segment-action 'instance 'sprite-list-menu))
-(with-eval-after-load 'projectile
-  (hud-modeline-set-segment-action 'projectile 'projectile-dispatch))
-
 ;;;; Rendering
 
 (defun hud-modeline--render-segments (segments)
@@ -951,12 +950,9 @@ annotations show [on]/[off], name, and description."
 
 (defun hud-modeline--init-delight ()
   "Apply `hud-modeline-delight-specs' using `delight' when active."
-  (when hud-modeline-mode
+  (when (and hud-modeline-mode hud-modeline-delight-specs)
     (require 'delight)
-    (when hud-modeline-delight-specs
-      (delight hud-modeline-delight-specs))))
-
-(add-hook 'hud-modeline-mode-hook #'hud-modeline--init-delight)
+    (delight hud-modeline-delight-specs)))
 
 ;;;###autoload
 (define-minor-mode hud-modeline-mode
@@ -968,6 +964,7 @@ annotations show [on]/[off], name, and description."
         (setq hud-modeline--saved-format (default-value 'mode-line-format))
         (setq-default mode-line-format hud-modeline-format)
         (hud-modeline--suppress-underlines)
+        (hud-modeline--init-delight)
         (when hud-modeline-box-style
           (hud-modeline--apply-box))
         (add-hook 'enable-theme-functions #'hud-modeline--on-theme-enable)
