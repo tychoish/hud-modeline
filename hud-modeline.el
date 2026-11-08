@@ -437,7 +437,7 @@ present in FROM-VAR."
  :description "Buffer name or project-relative path"
  :body (propertize
         (if-let* ((fname (buffer-file-name))
-                  (_ (string= (buffer-name) (file-name-nondirectory fname)))
+                  ((string= (buffer-name) (file-name-nondirectory fname)))
                   (root (and (bound-and-true-p projectile-mode)
                              (fboundp 'projectile-project-root)
                              (projectile-project-root))))
@@ -612,7 +612,7 @@ present in FROM-VAR."
                    (bare (string-trim
                           (replace-regexp-in-string
                            "\\`[[:space:]]*[A-Za-z]+[-:]" "" raw)))
-                   (_ (not (string-empty-p bare))))
+                   ((not (string-empty-p bare))))
          (let* ((icon (when (and hud-modeline-icons (fboundp 'nerd-icons-octicon))
                         (nerd-icons-octicon "nf-oct-git_branch" :face 'hud-modeline-vc)))
                 (branch (if icon
@@ -633,10 +633,10 @@ present in FROM-VAR."
  :name "Project"
  :description "Current project name"
  :place-after 'vc
- :body (when-let* ((_ (and (bound-and-true-p projectile-mode)
-                           (fboundp 'projectile-project-name)))
+ :body (when-let* (((and (bound-and-true-p projectile-mode)
+                          (fboundp 'projectile-project-name)))
                    (name (projectile-project-name))
-                   (_ (not (equal name "-"))))
+                   ((not (equal name "-"))))
          (concat (when vc-mode "| ")
                  (propertize name
                              'face 'mode-line-buffer-id
@@ -652,10 +652,10 @@ present in FROM-VAR."
  :name "Eglot"
  :description "LSP status (disable eglot misc-info entry to avoid duplication)"
  :place-after 'flycheck
- :body (when-let* ((_ (and (bound-and-true-p eglot--managed-mode)
-			   (fboundp 'eglot--mode-line-format)))
+ :body (when-let* (((and (bound-and-true-p eglot--managed-mode)
+			  (fboundp 'eglot--mode-line-format)))
 		   (s (format-mode-line '(eglot--managed-mode eglot--mode-line-format)))
-                   (_ (not (string-empty-p (string-trim s)))))
+                   ((not (string-empty-p (string-trim s)))))
          (concat s " ")))
 
 (defun hud-modeline--raise-backtrace ()
