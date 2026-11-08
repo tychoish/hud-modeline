@@ -949,6 +949,15 @@ annotations show [on]/[off], name, and description."
       (when hud-modeline-box-style
         (hud-modeline--apply-box)))))
 
+(defun hud-modeline--init-delight ()
+  "Apply `hud-modeline-delight-specs' using `delight' when `hud-modeline-mode' is active."
+  (when hud-modeline-mode
+    (require 'delight)
+    (when hud-modeline-delight-specs
+      (delight hud-modeline-delight-specs))))
+
+(add-hook 'hud-modeline-mode-hook #'hud-modeline--init-delight)
+
 ;;;###autoload
 (define-minor-mode hud-modeline-mode
   "Lightweight global modeline."
@@ -956,9 +965,6 @@ annotations show [on]/[off], name, and description."
   :group 'hud-modeline
   (if hud-modeline-mode
       (progn
-        (require 'delight)
-        (when (and (featurep 'delight) hud-modeline-delight-specs)
-          (delight hud-modeline-delight-specs))
         (setq hud-modeline--saved-format (default-value 'mode-line-format))
         (setq-default mode-line-format hud-modeline-format)
         (hud-modeline--suppress-underlines)
@@ -978,10 +984,6 @@ annotations show [on]/[off], name, and description."
       (hud-modeline--restore-boxes))
     (hud-modeline--restore-underlines)
     (setq-default mode-line-format hud-modeline--saved-format)))
-
-(with-eval-after-load 'delight
-  (when hud-modeline-delight-specs
-    (delight hud-modeline-delight-specs)))
 
 (provide 'hud-modeline)
 ;;; hud-modeline.el ends here
