@@ -950,7 +950,7 @@ annotations show [on]/[off], name, and description."
 
 (defun hud-modeline--init-delight ()
   "Apply `hud-modeline-delight-specs' using `delight' when active."
-  (when (and hud-modeline-mode hud-modeline-delight-specs)
+  (when (and (bound-and-true-p hud-modeline-mode) hud-modeline-delight-specs)
     (require 'delight)
     (delight hud-modeline-delight-specs)))
 
