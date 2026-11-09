@@ -15,6 +15,28 @@
 (require 'cl-lib)
 (require 'hud-modeline)
 
+(defvar anzu-cons-mode-line-p)
+
+(ert-deftest hud-modeline--anzu-display-lifecycle ()
+  "Suppress Anzu's display while HUD is active and restore its value."
+  (let ((hud-modeline-mode t)
+        (hud-modeline--anzu-saved nil)
+        (anzu-cons-mode-line-p t))
+    (hud-modeline--configure-anzu)
+    (should-not anzu-cons-mode-line-p)
+    (hud-modeline--configure-anzu)
+    (hud-modeline--restore-anzu)
+    (should anzu-cons-mode-line-p)))
+
+(ert-deftest hud-modeline--anzu-load-after-disable ()
+  "Anzu loaded after HUD is disabled keeps its original display setting."
+  (let ((hud-modeline-mode nil)
+        (hud-modeline--anzu-saved nil)
+        (anzu-cons-mode-line-p t))
+    (hud-modeline--configure-anzu)
+    (should anzu-cons-mode-line-p)
+    (should-not hud-modeline--anzu-saved)))
+
 (defvar projectile-mode nil)
 
 ;; Declare as defvar so let-bindings produce dynamic (special) bindings.

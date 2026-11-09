@@ -41,6 +41,8 @@
 (defvar anzu--current-position)
 (defvar anzu--total-matched)
 (defvar anzu--state)
+(defvar anzu-cons-mode-line-p)
+(defvar hud-modeline-mode)
 (defvar flycheck-current-errors)
 
 (declare-function anzu--reset-status "anzu")
@@ -568,12 +570,11 @@ present in FROM-VAR."
 
 ;;;; Integration segment registration
 
-;; Set anzu-cons-mode-line-p to nil in anzu config to suppress anzu's own insertion
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-right-segments
  :key 'anzu
  :name "Anzu"
- :description "Search match index (set anzu-cons-mode-line-p nil)"
+ :description "Search match index"
  :place-after 'misc
  :body (when (and (bound-and-true-p anzu--state)
                   (not (bound-and-true-p iedit-mode)))
@@ -954,6 +955,26 @@ annotations show [on]/[off], name, and description."
     (require 'delight)
     (delight hud-modeline-delight-specs)))
 
+(defvar hud-modeline--anzu-saved nil
+  "Previous Anzu display setting, wrapped in a list when managed.")
+
+(defun hud-modeline--configure-anzu ()
+  "Suppress Anzu's own modeline display while HUD is active."
+  (when (and (bound-and-true-p hud-modeline-mode)
+             (boundp 'anzu-cons-mode-line-p)
+             (not hud-modeline--anzu-saved))
+    (setq hud-modeline--anzu-saved (list anzu-cons-mode-line-p))
+    (setq anzu-cons-mode-line-p nil)))
+
+(defun hud-modeline--restore-anzu ()
+  "Restore Anzu's display setting after HUD is disabled."
+  (when hud-modeline--anzu-saved
+    (setq anzu-cons-mode-line-p (car hud-modeline--anzu-saved))
+    (setq hud-modeline--anzu-saved nil)))
+
+(with-eval-after-load 'anzu
+  (hud-modeline--configure-anzu))
+
 ;;;###autoload
 (define-minor-mode hud-modeline-mode
   "Lightweight global modeline."
@@ -965,6 +986,8 @@ annotations show [on]/[off], name, and description."
         (setq-default mode-line-format hud-modeline-format)
         (hud-modeline--suppress-underlines)
         (hud-modeline--init-delight)
+        (when (featurep 'anzu)
+          (hud-modeline--configure-anzu))
         (when hud-modeline-box-style
           (hud-modeline--apply-box))
         (add-hook 'enable-theme-functions #'hud-modeline--on-theme-enable)
@@ -980,6 +1003,7 @@ annotations show [on]/[off], name, and description."
     (when hud-modeline--saved-boxes
       (hud-modeline--restore-boxes))
     (hud-modeline--restore-underlines)
+    (hud-modeline--restore-anzu)
     (setq-default mode-line-format hud-modeline--saved-format)))
 
 (provide 'hud-modeline)
