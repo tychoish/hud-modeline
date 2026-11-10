@@ -16,47 +16,9 @@
 (require 'hud-modeline)
 
 (defvar anzu-cons-mode-line-p)
-
-(ert-deftest hud-modeline--anzu-display-lifecycle ()
-  "Suppress Anzu's display while HUD is active and restore its value."
-  (let ((hud-modeline-mode t)
-        (hud-modeline--anzu-saved nil)
-        (anzu-cons-mode-line-p t))
-    (hud-modeline--configure-anzu)
-    (should-not anzu-cons-mode-line-p)
-    (hud-modeline--configure-anzu)
-    (hud-modeline--restore-anzu)
-    (should anzu-cons-mode-line-p)))
-
-(ert-deftest hud-modeline--anzu-load-after-disable ()
-  "Anzu loaded after HUD is disabled keeps its original display setting."
-  (let ((hud-modeline-mode nil)
-        (hud-modeline--anzu-saved nil)
-        (anzu-cons-mode-line-p t))
-    (hud-modeline--configure-anzu)
-    (should anzu-cons-mode-line-p)
-    (should-not hud-modeline--anzu-saved)))
-
 (defvar projectile-mode nil)
-
-;; Declare as defvar so let-bindings produce dynamic (special) bindings.
-;; format-mode-line reads symbol values dynamically; lexical let-bindings
-;; (the default under lexical-binding: t) are invisible to it.
 (defvar hud-modeline--test-inhibit nil
-  "Test-only sentinel for format-mode-line conditional tests.")
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; format-mode-line / delight interaction
-;;
-;; format-mode-line handles 2-element (COND THEN) mode-line conditionals
-;; but silently drops the ELSE branch of 3-element (COND THEN ELSE) forms.
-;; Delight stores major-mode names as (INHIBIT-VAR ORIGINAL LIGHTER).
-;; The C mode-line renderer handles ELSE; format-mode-line (Lisp) does not.
-;;
-;; Note: format-mode-line returns "" for all constructs in batch mode
-;; (no display server).  Tests only assert empty-string outcomes here;
-;; positive-rendering assertions live in the hud-modeline--major-mode
-;; tests below, which bypass format-mode-line.
+  "Dynamically bound sentinel for mode-line conditional tests.")
 
 (ert-deftest hud-modeline--format-mode-line-cond-nil-returns-empty ()
   "format-mode-line (COND THEN): returns empty string when COND is nil."

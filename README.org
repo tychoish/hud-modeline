@@ -41,3 +41,15 @@ Install via [[https://github.com/tychoish/elpaish][ELPAish]]:
 * License
 
 GPL-3.0-or-later
+
+* Managed defaults
+
+=hud-modeline-mode= applies the =(SYMBOL . VALUE)= alist in =hud-modeline-settings=
+when enabled and restores the saved prior default values when disabled.
+Customize =hud-modeline-settings= before enabling =hud-modeline-mode= to adjust
+the managed defaults.
+
+HUD's default frame title uses =hud-modeline-instance-identity-function= to
+obtain an instance name.  Its default consults Sprite when available and falls
+back to =emacs=; set it to another function or nil to choose the identity.
+Set =hud-modeline-frame-title-format= to replace the whole title format.

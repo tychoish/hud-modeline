@@ -803,6 +803,67 @@ A list of constructs so packages like anzu that prepend to `mode-line-format'
 via `cons' get a proper list rather than tearing apart the first element.
 Right-alignment is provided by `mode-line-format-right-align'.")
 
+(defun hud-modeline--sprite-instance-id ()
+  "Return Sprite's instance identity when it is available."
+  (when (boundp 'sprite-instance-id)
+    (symbol-value 'sprite-instance-id)))
+
+(defcustom hud-modeline-instance-identity-function
+  #'hud-modeline--sprite-instance-id
+  "Function returning a frame title identity, or nil to use Emacs.
+The default consults Sprite if its instance ID is bound; Sprite is optional."
+  :type '(choice (const :tag "Use Emacs" nil) function)
+  :group 'hud-modeline)
+
+(defun hud-modeline--frame-title ()
+  "Return the frame title for the current buffer."
+  (format "%s:%s"
+          (or (and hud-modeline-instance-identity-function
+                   (funcall hud-modeline-instance-identity-function))
+              "emacs")
+          (buffer-name)))
+
+(defcustom hud-modeline-frame-title-format
+  '(:eval (hud-modeline--frame-title))
+  "Default frame title while HUD is active.  Frame-specific titles take precedence."
+  :type 'sexp :group 'hud-modeline)
+
+(defcustom hud-modeline-settings
+  `((anzu-cons-mode-line-p . nil)
+    (frame-title-format . ,hud-modeline-frame-title-format))
+  "Alist of `(SYMBOL . VALUE)' settings managed by `hud-modeline-mode'."
+  :type '(alist :key-type symbol :value-type sexp)
+  :group 'hud-modeline)
+
+(defvar hud-modeline--saved-settings nil
+  "Saved prior settings recorded by `hud-modeline--apply-settings'.")
+
+(defun hud-modeline--apply-settings ()
+  "Apply `hud-modeline-settings' and record prior default values."
+  (unless hud-modeline--saved-settings
+    (seq-do (lambda (entry)
+              (let ((symbol (car entry))
+                    (value (cdr entry)))
+                (push (cons symbol
+                            (cons (default-boundp symbol)
+                                  (and (default-boundp symbol)
+                                       (default-value symbol))))
+                      hud-modeline--saved-settings)
+                (set-default symbol value)))
+            hud-modeline-settings)))
+
+(defun hud-modeline--restore-settings ()
+  "Restore settings saved by `hud-modeline--apply-settings'."
+  (seq-do (lambda (entry)
+            (let ((symbol (car entry))
+                  (bound (cadr entry))
+                  (value (cddr entry)))
+              (if bound
+                  (set-default symbol value)
+                (makunbound symbol))))
+          hud-modeline--saved-settings)
+  (setq hud-modeline--saved-settings nil))
+
 (defvar hud-modeline--saved-format nil
   "Saved `mode-line-format' before `hud-modeline-mode' activation.")
 
@@ -955,26 +1016,6 @@ annotations show [on]/[off], name, and description."
     (require 'delight)
     (delight hud-modeline-delight-specs)))
 
-(defvar hud-modeline--anzu-saved nil
-  "Previous Anzu display setting, wrapped in a list when managed.")
-
-(defun hud-modeline--configure-anzu ()
-  "Suppress Anzu's own modeline display while HUD is active."
-  (when (and (bound-and-true-p hud-modeline-mode)
-             (boundp 'anzu-cons-mode-line-p)
-             (not hud-modeline--anzu-saved))
-    (setq hud-modeline--anzu-saved (list anzu-cons-mode-line-p))
-    (setq anzu-cons-mode-line-p nil)))
-
-(defun hud-modeline--restore-anzu ()
-  "Restore Anzu's display setting after HUD is disabled."
-  (when hud-modeline--anzu-saved
-    (setq anzu-cons-mode-line-p (car hud-modeline--anzu-saved))
-    (setq hud-modeline--anzu-saved nil)))
-
-(with-eval-after-load 'anzu
-  (hud-modeline--configure-anzu))
-
 ;;;###autoload
 (define-minor-mode hud-modeline-mode
   "Lightweight global modeline."
@@ -982,12 +1023,12 @@ annotations show [on]/[off], name, and description."
   :group 'hud-modeline
   (if hud-modeline-mode
       (progn
-        (setq hud-modeline--saved-format (default-value 'mode-line-format))
-        (setq-default mode-line-format hud-modeline-format)
+        (hud-modeline--apply-settings)
+        (unless hud-modeline--saved-format
+          (setq hud-modeline--saved-format (default-value 'mode-line-format))
+          (setq-default mode-line-format hud-modeline-format))
         (hud-modeline--suppress-underlines)
         (hud-modeline--init-delight)
-        (when (featurep 'anzu)
-          (hud-modeline--configure-anzu))
         (when hud-modeline-box-style
           (hud-modeline--apply-box))
         (add-hook 'enable-theme-functions #'hud-modeline--on-theme-enable)
@@ -1003,8 +1044,10 @@ annotations show [on]/[off], name, and description."
     (when hud-modeline--saved-boxes
       (hud-modeline--restore-boxes))
     (hud-modeline--restore-underlines)
-    (hud-modeline--restore-anzu)
-    (setq-default mode-line-format hud-modeline--saved-format)))
+    (hud-modeline--restore-settings)
+    (when hud-modeline--saved-format
+      (setq-default mode-line-format hud-modeline--saved-format)
+      (setq hud-modeline--saved-format nil))))
 
 (provide 'hud-modeline)
 ;;; hud-modeline.el ends here
