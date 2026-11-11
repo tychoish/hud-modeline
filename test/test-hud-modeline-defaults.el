@@ -82,7 +82,11 @@
           (hud-modeline--restore-settings)
           (should (equal (frame-parameter frame 'name) "hud-user-title")))
       (hud-modeline--restore-settings)
-      (modify-frame-parameters frame `((name . ,prior))))))
+      (modify-frame-parameters
+       frame `((name . ,(if (and (stringp prior)
+                                 (string-match-p "\\`F[0-9]+\\'" prior))
+                            nil
+                          prior)))))))
 
 (provide 'test-hud-modeline-defaults)
 ;;; test-hud-modeline-defaults.el ends here
