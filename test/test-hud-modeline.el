@@ -243,6 +243,36 @@ ENABLED defaults to t when omitted."
   (should (assq 'misc hud-modeline-right-segments)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; hud-modeline--action-map & segment actions
+
+(ert-deftest hud-modeline--action-map-vc-defaults-to-magit-dispatch ()
+  "When magit-dispatch is fboundp, 'vc action defaults to magit-dispatch."
+  (let ((hud-modeline--action-keymaps nil))
+    (cl-letf (((symbol-function 'magit-dispatch) (lambda () (interactive))))
+      (let ((map (hud-modeline--action-map 'vc)))
+        (should (keymapp map))
+        (should (eq (lookup-key map [mode-line mouse-1]) 'magit-dispatch))))))
+
+(ert-deftest hud-modeline--action-map-vc-nil-when-unbound ()
+  "When magit-dispatch is not bound, 'vc action returns nil."
+  (let ((hud-modeline--action-keymaps nil)
+        (orig-fboundp (symbol-function 'fboundp)))
+    (cl-letf (((symbol-function 'fboundp)
+               (lambda (sym)
+                 (if (eq sym 'magit-dispatch)
+                     nil
+                   (funcall orig-fboundp sym)))))
+      (should-not (hud-modeline--action-map 'vc)))))
+
+(ert-deftest hud-modeline--action-map-prefers-explicit-action ()
+  "Explicitly registered segment action overrides defaults."
+  (let ((hud-modeline--action-keymaps nil))
+    (hud-modeline-set-segment-action 'vc #'ignore)
+    (let ((map (hud-modeline--action-map 'vc)))
+      (should (keymapp map))
+      (should (eq (lookup-key map [mode-line mouse-1]) #'ignore)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--pad
 
 (ert-deftest hud-modeline--pad-adds-leading-space ()

@@ -359,7 +359,8 @@ Replaces any previously registered action for KEY."
   (or (map-elt hud-modeline--action-keymaps key)
       (let ((cmd (pcase key
                    ('instance (when (fboundp 'sprite-list-menu) 'sprite-list-menu))
-                   ('projectile (when (fboundp 'projectile-dispatch) 'projectile-dispatch)))))
+                   ('projectile (when (fboundp 'projectile-dispatch) 'projectile-dispatch))
+                   ('vc (when (fboundp 'magit-dispatch) 'magit-dispatch)))))
         (when cmd
           (hud-modeline-set-segment-action key cmd)))))
 
