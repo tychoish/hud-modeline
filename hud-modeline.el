@@ -189,6 +189,26 @@ Any combination of:
 
 ;;;; Faces
 
+;; Entries removed from the misc segment, so they can be shown (and toggled)
+;; as their own segments.
+(defcustom hud-modeline-misc-excluded-entries
+  '((:eval (sprite-desktop--indicator-string)))
+  "Entries of `global-mode-string' omitted from the misc segment.
+Matched with `equal'; use this to hide an item or give it its own segment."
+  :type '(repeat sexp)
+  :group 'hud-modeline)
+
+(defun hud-modeline--misc-entries ()
+  "Return `mode-line-misc-info' with `global-mode-string' filtered."
+  (seq-map (lambda (entry)
+             (if (and (consp entry) (eq (car entry) 'global-mode-string))
+                 (list 'global-mode-string
+                       (list "" (seq-remove
+                                 (lambda (e) (member e hud-modeline-misc-excluded-entries))
+                                 (ensure-list global-mode-string))))
+               entry))
+           mode-line-misc-info))
+
 (defface hud-modeline-modified
   '((t :inherit warning :weight bold :underline nil))
   "Face for modified buffer indicator."
@@ -704,6 +724,18 @@ present in FROM-VAR."
                              'mouse-face 'mode-line-highlight
                              'help-echo "mouse-1: projectile dispatch")
                  " ")))
+
+(declare-function sprite-desktop--indicator-string "sprite-desktop")
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'desktop
+ :name "Desktop"
+ :description "Staged desktop restore progress (n/m)"
+ :place-before 'misc
+ :body (when (fboundp 'sprite-desktop--indicator-string)
+         (let ((s (sprite-desktop--indicator-string)))
+           (unless (string-empty-p s) s))))
 
 ;; Enable only when eglot's misc-info entry is suppressed to avoid duplication
 (hud-modeline-add-segment
