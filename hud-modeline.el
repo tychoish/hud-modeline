@@ -149,6 +149,7 @@
     (outline-minor-mode nil outline)
     (cursor-sensor-mode nil cursor-sensor)
     (agent-shell-notifications-mode nil agent-shell-notifications)
+    (diff-review-file-mode nil diff-review)
     (terraform-mode "tf" :major))
   "List of specifications passed to `delight' when `hud-modeline-mode' is active."
   :type '(repeat sexp)
@@ -398,6 +399,7 @@ Replaces any previously registered action for KEY."
       (let ((cmd (pcase key
                    ('instance (when (fboundp 'sprite-list-menu) 'sprite-list-menu))
                    ('projectile (when (fboundp 'projectile-dispatch) 'projectile-dispatch))
+                   ('review (when (fboundp 'diff-review-overview) 'diff-review-overview))
                    ('vc (when (fboundp 'magit-dispatch) 'magit-dispatch)))))
         (when cmd
           (hud-modeline-set-segment-action key cmd)))))
@@ -761,6 +763,55 @@ present in FROM-VAR."
          (let ((s (sprite-desktop--indicator-string)))
            (unless (string-empty-p s)
              (subst-char-in-string ?⧗ ?* s)))))
+
+(defvar diff-review--files)
+(defvar diff-review--viewed)
+(defvar diff-review--comments)
+(declare-function diff-review--review-buffer "diff-review" ())
+(declare-function diff-review-overview "diff-review" ())
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'review
+ :name "Review"
+ :description "Active diff-review viewed progress and open thread count"
+ :place-before 'misc
+ :body (when-let* (((fboundp 'diff-review--review-buffer))
+                   (rev-buf (diff-review--review-buffer))
+                   ((buffer-live-p rev-buf)))
+         (with-current-buffer rev-buf
+           (let* ((files (or (bound-and-true-p diff-review--files) []))
+                  (total-files (length files))
+                  (viewed-ht (bound-and-true-p diff-review--viewed))
+                  (viewed-count (if (hash-table-p viewed-ht)
+                                    (seq-count
+                                     (lambda (f)
+                                       (equal (map-elt viewed-ht (plist-get f :path))
+                                              (plist-get f :hash)))
+                                     files)
+                                  0))
+                  (comments (or (bound-and-true-p diff-review--comments) []))
+                  (open-count (seq-count
+                               (lambda (c)
+                                 (not (eq (map-elt c "resolved") t)))
+                               comments))
+                  (label (concat
+                          (format "Rev %d/%d" viewed-count total-files)
+                          (if (> open-count 0)
+                              (format " ◆%d" open-count)
+                            "")))
+                  (rendered (propertize label
+                                        'face (if (> open-count 0)
+                                                  'hud-modeline-warning
+                                                'hud-modeline-vc))))
+             (concat
+              (if-let* ((km (hud-modeline--action-map 'review)))
+                  (propertize rendered
+                              'local-map km
+                              'mouse-face 'mode-line-highlight
+                              'help-echo "mouse-1: diff-review overview")
+                rendered)
+              " ")))))
 
 ;; Enable only when eglot's misc-info entry is suppressed to avoid duplication
 (hud-modeline-add-segment

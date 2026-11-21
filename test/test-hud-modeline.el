@@ -550,4 +550,43 @@ not a flag-toggling command."
                         (cdr pair))))
           '((abbrev-mode . abbrev) (emojify-mode . emojify)
             (telega-chat-auto-fill-mode . telega-chat)
+            (diff-review-file-mode . diff-review)
             (slime-mode . slime) (slime-autodoc-mode . slime-autodoc))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; hud-modeline--review-segment
+
+(ert-deftest hud-modeline--review-segment-nil-outside-review ()
+  "The review segment returns nil when no diff-review buffer is associated."
+  (cl-letf (((symbol-function 'diff-review--review-buffer) (lambda () nil)))
+    (should-not (hud-modeline--review-segment))))
+
+(ert-deftest hud-modeline--review-segment-renders-progress-and-open-threads ()
+  "The review segment displays viewed file progress, open thread count, and mouse-1 action."
+  (let ((hud-modeline--action-keymaps nil))
+    (with-temp-buffer
+      (let ((rev-buf (current-buffer))
+            (viewed (make-hash-table :test #'equal))
+            (c-open (make-hash-table :test #'equal))
+            (c-done (make-hash-table :test #'equal)))
+        (setf (map-elt viewed "a.el") "sha-a")
+        (setf (map-elt viewed "b.el") "stale-sha")
+        (setf (map-elt c-open "resolved") :false)
+        (setf (map-elt c-done "resolved") t)
+        (setq-local diff-review--files
+                    (vector '(:path "a.el" :hash "sha-a")
+                            '(:path "b.el" :hash "sha-b")
+                            '(:path "c.el" :hash "sha-c")))
+        (setq-local diff-review--viewed viewed)
+        (setq-local diff-review--comments (vector c-open c-done))
+        (cl-letf (((symbol-function 'diff-review--review-buffer)
+                   (lambda () rev-buf))
+                  ((symbol-function 'diff-review-overview)
+                   (lambda () (interactive))))
+          (let* ((seg (hud-modeline--review-segment))
+                 (plain (substring-no-properties seg))
+                 (km (get-text-property 0 'local-map seg)))
+            (should (equal plain "Rev 1/3 ◆1 "))
+            (should (keymapp km))
+            (should (eq (lookup-key km [mode-line mouse-1])
+                        'diff-review-overview))))))))
