@@ -242,6 +242,22 @@ ENABLED defaults to t when omitted."
   "Live right segments alist contains the misc key."
   (should (assq 'misc hud-modeline-right-segments)))
 
+(ert-deftest hud-modeline--misc-excludes-desktop-indicator ()
+  "The misc segment filters desktop while preserving other global entries."
+  (let ((global-mode-string '((:eval (sprite-desktop--indicator-string)) " battery"))
+        (mode-line-misc-info '((global-mode-string ("" global-mode-string)))))
+    (cl-letf (((symbol-function 'format-mode-line)
+               (lambda (format &rest _) (prin1-to-string format))))
+      (let ((misc (hud-modeline--misc-segment)))
+        (should-not (string-search "sprite-desktop--indicator-string" misc))
+        (should (string-search "battery" misc))))))
+
+(ert-deftest hud-modeline--desktop-uses-small-indicator ()
+  "The desktop segment replaces the tall hourglass while preserving progress."
+  (cl-letf (((symbol-function 'sprite-desktop--indicator-string)
+             (lambda () " ⧗ desktop 4/10")))
+    (should (equal " * desktop 4/10" (hud-modeline--desktop-segment)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--action-map & segment actions
 
@@ -500,3 +516,20 @@ not a flag-toggling command."
     (should (equal "Second title" (hud-modeline--org-title)))
     (erase-buffer)
     (should-not (hud-modeline--org-title))))
+
+(ert-deftest hud-modeline--delight-abbrev-lighter ()
+  "The Abbrev lighter is shortened after the abbrev feature loads."
+  (require 'abbrev)
+  (let ((minor-mode-alist '((abbrev-mode " Abbrev")))
+        (delight-delighted-modes nil))
+    (delight (list (assq 'abbrev-mode hud-modeline-delight-specs)))
+    (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " abb"))))
+
+(ert-deftest hud-modeline--delight-minor-mode-features ()
+  "Minor mode specs wait for the features that define their modes."
+  (seq-do (lambda (pair)
+            (should (eq (nth 2 (assq (car pair) hud-modeline-delight-specs))
+                        (cdr pair))))
+          '((abbrev-mode . abbrev) (emojify-mode . emojify)
+            (telega-chat-auto-fill-mode . telega-chat)
+            (slime-mode . slime) (slime-autodoc-mode . slime-autodoc))))
