@@ -209,6 +209,18 @@ Matched with `equal'; use this to hide an item or give it its own segment."
                entry))
            mode-line-misc-info))
 
+(defvar-local hud-modeline--org-title-cache nil
+  "Cached Org document title and buffer modification tick.")
+
+(defun hud-modeline--org-title ()
+  "Return the current Org document title, caching it until the buffer changes."
+  (when (derived-mode-p 'org-mode)
+    (let ((tick (buffer-chars-modified-tick)))
+      (unless (eq tick (car-safe hud-modeline--org-title-cache))
+        (setq hud-modeline--org-title-cache
+              (cons tick (car (cdr (assoc "TITLE" (org-collect-keywords '("TITLE"))))))))
+      (cdr hud-modeline--org-title-cache))))
+
 (defface hud-modeline-modified
   '((t :inherit warning :weight bold :underline nil))
   "Face for modified buffer indicator."
@@ -578,11 +590,14 @@ present in FROM-VAR."
  :key 'misc
  :name "Misc Info"
  :description "Miscellaneous mode-line info (battery, flyspell, etc.); excludes eglot, which has its own segment"
- :body (let ((misc (format-mode-line
+ :body (let* ((title (hud-modeline--org-title))
+              (misc (concat (if (and title (not (string-empty-p title)))
+                                (concat title "  ") "")
+                            (format-mode-line
                     (seq-remove (lambda (entry)
                                   (and (consp entry)
                                        (eq (car entry) 'eglot--managed-mode)))
-                                mode-line-misc-info))))
+                                mode-line-misc-info)))))
          (unless (string-empty-p (string-trim misc))
            (if (and hud-modeline-misc-max-width
                     (> (string-width misc) hud-modeline-misc-max-width))

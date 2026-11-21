@@ -485,3 +485,18 @@ not a flag-toggling command."
             (emacs-lisp-mode)
             (should (equal "EL" (hud-modeline--major-mode)))))
       (hud-modeline-mode -1))))
+
+(ert-deftest hud-modeline-org-title-updates-after-edit ()
+  "The Org title follows edits and ignores non-Org buffers."
+  (require 'org)
+  (with-temp-buffer
+    (insert "#+title: First title\n\nText\n")
+    (should-not (hud-modeline--org-title))
+    (org-mode)
+    (should (equal "First title" (hud-modeline--org-title)))
+    (goto-char (point-min))
+    (search-forward "First title")
+    (replace-match "Second title")
+    (should (equal "Second title" (hud-modeline--org-title)))
+    (erase-buffer)
+    (should-not (hud-modeline--org-title))))
