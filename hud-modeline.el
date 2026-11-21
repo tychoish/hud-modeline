@@ -183,6 +183,11 @@ Any combination of:
               (const :tag "Bordered" bordered))
   :group 'hud-modeline)
 
+(defcustom hud-modeline-show-org-title nil
+  "Show an Org title in misc when it differs from the buffer name."
+  :type 'boolean
+  :group 'hud-modeline)
+
 (defcustom hud-modeline-misc-max-width nil
   "Maximum display-column width for the misc segment, or nil for no cap."
   :type '(choice integer (const :tag "Unlimited" nil))
@@ -591,8 +596,11 @@ present in FROM-VAR."
  :key 'misc
  :name "Misc Info"
  :description "Miscellaneous mode-line info (battery, flyspell, etc.); excludes eglot, which has its own segment"
- :body (let* ((title (hud-modeline--org-title))
-              (misc (concat (if (and title (not (string-empty-p title)))
+ :body (let* ((title (when hud-modeline-show-org-title
+                       (hud-modeline--org-title)))
+              ;; TODO: Make the title a button for a future orgx-dispatch transient.
+              (misc (concat (if (and title (not (string-empty-p title))
+                                     (not (equal title (buffer-name))))
                                 (concat title "  ") "")
                             (format-mode-line
                     (seq-remove (lambda (entry)

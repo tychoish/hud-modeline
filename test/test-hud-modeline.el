@@ -502,6 +502,24 @@ not a flag-toggling command."
             (should (equal "EL" (hud-modeline--major-mode)))))
       (hud-modeline-mode -1))))
 
+(ert-deftest hud-modeline-org-title-misc-visibility ()
+  "Show a distinct Org title in misc only when enabled."
+  (require 'org)
+  (should-not (eval (car (get 'hud-modeline-show-org-title 'standard-value))))
+  (with-temp-buffer
+    (org-mode)
+    (insert "#+title: Example title\n")
+    (rename-buffer "Example title" t)
+    (let ((hud-modeline-show-org-title nil)
+          (mode-line-misc-info nil))
+      (should-not (hud-modeline--misc-segment))
+      (setq hud-modeline-show-org-title t)
+      (should-not (hud-modeline--misc-segment))
+      (rename-buffer "Different buffer" t)
+      (should (equal "Example title  " (hud-modeline--misc-segment)))
+      (erase-buffer)
+      (should-not (hud-modeline--misc-segment)))))
+
 (ert-deftest hud-modeline-org-title-updates-after-edit ()
   "The Org title follows edits and ignores non-Org buffers."
   (require 'org)
