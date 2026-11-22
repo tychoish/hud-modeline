@@ -296,8 +296,9 @@ any other non-nil value is the cached icon string.")
 
 (defun hud-modeline--major-mode ()
   "Return the major mode name as a string or mode-line construct.
-Handles configured names in `hud-modeline-lighter-specs' when `hud-modeline-mode'
-is active, as well as legacy 3-element (INHIBIT-VAR ORIGINAL LIGHTER) forms."
+Handles configured names in `hud-modeline-lighter-specs' when
+`hud-modeline-mode' is active, as well as legacy 3-element
+(INHIBIT-VAR ORIGINAL LIGHTER) forms."
   (let* ((spec (when (bound-and-true-p hud-modeline-mode)
                  (assq major-mode hud-modeline-lighter-specs)))
          (raw (if (and spec (eq (nth 2 spec) :major))
@@ -436,9 +437,12 @@ minor modes (or `t' if already loaded).  If omitted, FILE defaults to MODE."
 (defun hud-modeline-set-lighter (spec &optional value file)
   "Set the mode line lighter or display name for a mode.
 SPEC can be:
-- A mode symbol: (hud-modeline-set-lighter \\='abbrev-mode \" abb\" \\='abbrev)
-- A single specification list: (hud-modeline-set-lighter \\='(abbrev-mode \" abb\" abbrev))
-- A list of specifications: (hud-modeline-set-lighter \\='((abbrev-mode \" abb\" abbrev) ...))
+- A mode symbol:
+  (hud-modeline-set-lighter \\='abbrev-mode \" abb\" \\='abbrev)
+- A single specification list:
+  (hud-modeline-set-lighter \\='(abbrev-mode \" abb\" abbrev))
+- A list of specifications:
+  (hud-modeline-set-lighter \\='((abbrev-mode \" abb\" abbrev) ...))
 
 When SPEC is a mode symbol:
 VALUE is the replacement string or mode-line construct, or nil to hide.
@@ -495,7 +499,8 @@ When SPEC is a list of specifications, VALUE and FILE are ignored."
       (hud-modeline--apply-major-mode-name buf))))
 
 (defun hud-modeline--restore-lighters ()
-  "Restore original minor mode lighters and mode-name when `hud-modeline-mode' is disabled."
+  "Restore original minor mode lighters and `mode-name'.
+Called when `hud-modeline-mode' is disabled."
   (map-do (lambda (mode orig-val)
             (when-let* ((cell (assq mode minor-mode-alist)))
               (setcar (cdr cell) orig-val)))
