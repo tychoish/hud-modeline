@@ -1,7 +1,7 @@
 ;;; test-hud-modeline.el --- ERT tests for hud-modeline.el -*- lexical-binding: t; no-byte-compile: t; -*-
 
 ;;; Commentary:
-;; Tests for hud-modeline segment rendering, delight interaction, alignment,
+;; Tests for hud-modeline segment rendering, lighter configuration, alignment,
 ;; and the segment management API.
 ;;
 ;; Run in a live session:  M-x ert RET "hud-modeline--" RET
@@ -27,23 +27,19 @@
 
 (ert-deftest hud-modeline--format-mode-line-3-element-else-dropped ()
   "format-mode-line (COND THEN ELSE): ELSE is silently dropped when COND is nil.
-Root cause: delight stores (INHIBIT-VAR ORIGINAL LIGHTER) in mode-name.
+3-element mode-name format: (INHIBIT-VAR ORIGINAL LIGHTER).
 With INHIBIT-VAR nil the C renderer shows LIGHTER, but format-mode-line
-returns empty string instead.
-This behavior only manifests in batch mode without delight: delight's advice
-around format-mode-line correctly returns the lighter in interactive sessions."
-  (skip-unless (and noninteractive (not (featurep 'delight))))
+returns empty string instead in batch mode."
+  (skip-unless noninteractive)
   (let ((hud-modeline--test-inhibit nil))
     (should (equal "" (format-mode-line '(hud-modeline--test-inhibit "original" "lighter"))))))
 
-(ert-deftest hud-modeline--delight-form-via-format-mode-line-returns-empty ()
-  "format-mode-line of a delight 3-element mode-name returns empty string.
-Confirms the root cause: format-mode-line cannot render the lighter without
-delight's advice active.  Skipped when delight is loaded because delight's
-advice on format-mode-line causes it to render the lighter instead."
-  (skip-unless (and noninteractive (not (featurep 'delight))))
+(ert-deftest hud-modeline--3-element-form-via-format-mode-line-returns-empty ()
+  "format-mode-line of a 3-element mode-name returns empty string in batch mode.
+Confirms format-mode-line does not evaluate the ELSE branch when the condition is nil."
+  (skip-unless noninteractive)
   (with-temp-buffer
-    (setq-local mode-name '(delight-mode-name-inhibit "Fundamental" "fun"))
+    (setq-local mode-name '(hud-modeline-inhibit-major-mode "Fundamental" "fun"))
     (should (equal "" (format-mode-line mode-name nil nil (current-buffer))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -64,21 +60,21 @@ advice on format-mode-line causes it to render the lighter instead."
         (should (equal 8 (length result)))
         (should (string-suffix-p "…" result))))))
 
-(ert-deftest hud-modeline--major-mode-delight-form-returns-lighter ()
-  "`hud-modeline--major-mode' returns LIGHTER from a delight 3-element form."
+(ert-deftest hud-modeline--major-mode-3-element-form-returns-lighter ()
+  "`hud-modeline--major-mode' returns LIGHTER from a 3-element form."
   (with-temp-buffer
-    (setq-local mode-name '(delight-mode-name-inhibit "Fundamental" "fun"))
+    (setq-local mode-name '(hud-modeline-inhibit-major-mode "Fundamental" "fun"))
     (should (equal "fun" (hud-modeline--major-mode)))))
 
-(ert-deftest hud-modeline--major-mode-delight-inhibited-returns-original ()
-  "When the delight inhibit variable is non-nil, the original name is shown."
+(ert-deftest hud-modeline--major-mode-inhibited-returns-original ()
+  "When the inhibit variable is non-nil, the original name is shown."
   (with-temp-buffer
     (setq-local mode-name '(hud-modeline--test-inhibit "Original" "lighter"))
     (let ((hud-modeline--test-inhibit t))
       (should (equal "Original" (hud-modeline--major-mode))))))
 
-(ert-deftest hud-modeline--major-mode-delight-uninhibited-returns-lighter ()
-  "When the delight inhibit variable is nil, the lighter is shown."
+(ert-deftest hud-modeline--major-mode-uninhibited-returns-lighter ()
+  "When the inhibit variable is nil, the lighter is shown."
   (with-temp-buffer
     (setq-local mode-name '(hud-modeline--test-inhibit "Original" "lighter"))
     (let ((hud-modeline--test-inhibit nil))
@@ -97,21 +93,18 @@ inhibit bindings."
         (let ((hud-modeline--test-inhibit t))
           (should (equal "lighter" captured)))))))
 
-(ert-deftest hud-modeline--major-mode-delight-symbol-void-returns-lighter ()
-  "hud-modeline--major-mode returns lighter when delight-mode-name-inhibit is void.
-delight calls (makunbound 'delight-mode-name-inhibit) at load time so the
-variable is void between mode-line renders — this is the primary runtime path.
-Regression: if this fails, hud-modeline--major-mode is likely being called
-inside format-mode-line where delight's advice binds the variable to non-nil."
+(ert-deftest hud-modeline--major-mode-symbol-void-returns-lighter ()
+  "`hud-modeline--major-mode' returns lighter when the condition variable is void."
   (with-temp-buffer
-    (setq-local mode-name '(delight-mode-name-inhibit "Fundamental" "fun"))
+    (setq-local mode-name '(hud-modeline--test-void-var "Fundamental" "fun"))
+    (makunbound 'hud-modeline--test-void-var)
     (should (equal "fun" (hud-modeline--major-mode)))))
 
 (ert-deftest hud-modeline--major-mode-non-string-lighter-passthrough ()
   "hud-modeline--major-mode passes non-string lighters through unchanged."
   (with-temp-buffer
-    (setq-local mode-name '(delight-mode-name-inhibit "Emacs-Lisp"
-                                                      ("el" (lexical-binding ":l" ":d"))))
+    (setq-local mode-name '(hud-modeline-inhibit-major-mode "Emacs-Lisp"
+                                                            ("el" (lexical-binding ":l" ":d"))))
     (should (equal '("el" (lexical-binding ":l" ":d"))
                    (hud-modeline--major-mode)))))
 
@@ -491,9 +484,9 @@ not a flag-toggling command."
         (should-not (memq #'hud-modeline--on-make-frame after-make-frame-functions)))
     (hud-modeline-mode -1)))
 
-(ert-deftest hud-modeline--delight-specs-configured ()
-  "`hud-modeline-mode` configures `delight' when enabled."
-  (let ((hud-modeline-delight-specs '((emacs-lisp-mode "EL" :major))))
+(ert-deftest hud-modeline--lighter-specs-configured ()
+  "`hud-modeline-mode' configures major mode name when enabled."
+  (let ((hud-modeline-lighter-specs '((emacs-lisp-mode "EL" :major))))
     (unwind-protect
         (progn
           (hud-modeline-mode 1)
@@ -535,18 +528,17 @@ not a flag-toggling command."
     (erase-buffer)
     (should-not (hud-modeline--org-title))))
 
-(ert-deftest hud-modeline--delight-abbrev-lighter ()
-  "The Abbrev lighter is shortened after the abbrev feature loads."
+(ert-deftest hud-modeline--abbrev-lighter ()
+  "The Abbrev lighter is shortened after setting lighter."
   (require 'abbrev)
-  (let ((minor-mode-alist '((abbrev-mode " Abbrev")))
-        (delight-delighted-modes nil))
-    (delight (list (assq 'abbrev-mode hud-modeline-delight-specs)))
+  (let ((minor-mode-alist '((abbrev-mode " Abbrev"))))
+    (hud-modeline-set-lighter (list (assq 'abbrev-mode hud-modeline-lighter-specs)))
     (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " abb"))))
 
-(ert-deftest hud-modeline--delight-minor-mode-features ()
+(ert-deftest hud-modeline--minor-mode-features ()
   "Minor mode specs wait for the features that define their modes."
   (seq-do (lambda (pair)
-            (should (eq (nth 2 (assq (car pair) hud-modeline-delight-specs))
+            (should (eq (nth 2 (assq (car pair) hud-modeline-lighter-specs))
                         (cdr pair))))
           '((abbrev-mode . abbrev) (emojify-mode . emojify)
             (telega-chat-auto-fill-mode . telega-chat)

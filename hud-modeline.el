@@ -104,9 +104,6 @@
   :type 'boolean
   :group 'hud-modeline)
 
-(define-obsolete-variable-alias 'hud-modeline-delight-specs
-  'hud-modeline-lighter-specs "0.2.0")
-
 (defcustom hud-modeline-lighter-specs
   '((fundamental-mode "fun" :major)
     (abbrev-mode " abb" abbrev)
@@ -388,7 +385,6 @@ Use `hud-modeline-enable-segment' to re-enable."
 
 ;;;; Lighter management API
 
-(defvaralias 'delight-mode-name-inhibit 'hud-modeline-inhibit-major-mode)
 (defvar hud-modeline-inhibit-major-mode nil
   "When non-nil, the original `mode-name' is displayed instead of the lighter.")
 
@@ -404,8 +400,8 @@ Use `hud-modeline-enable-segment' to re-enable."
           (let ((lighter (nth 1 spec)))
             (unless (and (consp mode-name)
                          (symbolp (car mode-name))
-                         (memq (car mode-name) '(hud-modeline-inhibit-major-mode delight-mode-name-inhibit)))
-              (setq-local mode-name `(delight-mode-name-inhibit ,mode-name ,lighter)))))))))
+                         (eq (car mode-name) 'hud-modeline-inhibit-major-mode))
+              (setq-local mode-name `(hud-modeline-inhibit-major-mode ,mode-name ,lighter)))))))))
 
 (defun hud-modeline--apply-minor-lighter (mode value)
   "Apply VALUE as the lighter for minor MODE in `minor-mode-alist'."
@@ -462,12 +458,6 @@ When SPEC is a list of specifications, VALUE and FILE are ignored."
       (hud-modeline--register-lighter (nth 0 s) (nth 1 s) (nth 2 s)))))
 
 ;;;###autoload
-(defalias 'hud-modeline-delight #'hud-modeline-set-lighter)
-
-(unless (fboundp 'delight)
-  (defalias 'delight #'hud-modeline-set-lighter))
-
-;;;###autoload
 (defun hud-modeline-remove-lighter (mode)
   "Remove any custom lighter or major-mode rename for MODE."
   (interactive
@@ -515,10 +505,8 @@ When SPEC is a list of specifications, VALUE and FILE are ignored."
     (with-current-buffer buf
       (when (and (consp mode-name)
                  (symbolp (car mode-name))
-                 (memq (car mode-name) '(hud-modeline-inhibit-major-mode delight-mode-name-inhibit)))
+                 (eq (car mode-name) 'hud-modeline-inhibit-major-mode))
         (setq-local mode-name (cadr mode-name))))))
-
-(defalias 'hud-modeline--init-delight #'hud-modeline--init-lighters)
 
 ;;;; Segment actions
 
