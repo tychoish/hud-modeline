@@ -553,6 +553,44 @@ not a flag-toggling command."
             (diff-review-file-mode . diff-review)
             (slime-mode . slime) (slime-autodoc-mode . slime-autodoc))))
 
+(ert-deftest hud-modeline--set-lighter-single-and-batch ()
+  "`hud-modeline-set-lighter' configures individual and batch specs."
+  (let ((hud-modeline-lighter-specs nil)
+        (hud-modeline--saved-minor-lighters (make-hash-table :test #'eq))
+        (minor-mode-alist '((abbrev-mode " Abbrev") (flycheck-mode " Flycheck"))))
+    ;; Single spec via arguments
+    (hud-modeline-set-lighter 'abbrev-mode " abb" 'abbrev)
+    (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " abb"))
+    (should (equal (nth 1 (assq 'abbrev-mode hud-modeline-lighter-specs)) " abb"))
+    ;; Batch spec
+    (hud-modeline-set-lighter '((flycheck-mode " fc" flycheck)
+                                (markdown-mode "md" :major)))
+    (should (equal (cadr (assq 'flycheck-mode minor-mode-alist)) " fc"))
+    (should (equal (nth 1 (assq 'markdown-mode hud-modeline-lighter-specs)) "md"))))
+
+(ert-deftest hud-modeline--remove-lighter-restores-original ()
+  "`hud-modeline-remove-lighter' restores the original minor mode lighter."
+  (let ((hud-modeline-lighter-specs nil)
+        (hud-modeline--saved-minor-lighters (make-hash-table :test #'eq))
+        (minor-mode-alist '((abbrev-mode " Abbrev"))))
+    (hud-modeline-set-lighter 'abbrev-mode " abb" 'abbrev)
+    (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " abb"))
+    (hud-modeline-remove-lighter 'abbrev-mode)
+    (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " Abbrev"))
+    (should-not (assq 'abbrev-mode hud-modeline-lighter-specs))))
+
+(ert-deftest hud-modeline--mode-disable-restores-lighters ()
+  "Disabling `hud-modeline-mode' restores modified minor mode lighters."
+  (let ((minor-mode-alist '((abbrev-mode " Abbrev")))
+        (hud-modeline-lighter-specs '((abbrev-mode " abb" abbrev))))
+    (unwind-protect
+        (progn
+          (hud-modeline-mode 1)
+          (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " abb"))
+          (hud-modeline-mode -1)
+          (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " Abbrev")))
+      (hud-modeline-mode -1))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--review-segment
 

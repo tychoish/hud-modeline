@@ -28,9 +28,9 @@ jobs:
       - name: Lint Source Code
         uses: tychoish/elisp-ci/lint@main
         with:
-          dependencies: "delight nerd-icons annotated-completing-read projectile"
+          dependencies: "nerd-icons annotated-completing-read projectile"
 
       - name: Run Tests
         uses: tychoish/elisp-ci@main
         with:
-          dependencies: "delight nerd-icons annotated-completing-read projectile"
+          dependencies: "nerd-icons annotated-completing-read projectile"
