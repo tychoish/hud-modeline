@@ -3,4 +3,5 @@
 .deps/
 *~
 #*#
+build/
 .projectile-cache.eld

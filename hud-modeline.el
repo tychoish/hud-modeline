@@ -388,8 +388,24 @@ Use `hud-modeline-enable-segment' to re-enable."
 
 ;;;; Lighter management API
 
+(defvaralias 'delight-mode-name-inhibit 'hud-modeline-inhibit-major-mode)
+(defvar hud-modeline-inhibit-major-mode nil
+  "When non-nil, the original `mode-name' is displayed instead of the lighter.")
+
 (defvar hud-modeline--saved-minor-lighters (make-hash-table :test #'eq)
   "Hash table mapping minor mode symbols to their original lighters.")
+
+(defun hud-modeline--apply-major-mode-name (&optional buffer)
+  "Apply configured major mode name to `mode-name' in BUFFER (default current)."
+  (with-current-buffer (or buffer (current-buffer))
+    (when (bound-and-true-p hud-modeline-mode)
+      (when-let* ((spec (assq major-mode hud-modeline-lighter-specs)))
+        (when (eq (nth 2 spec) :major)
+          (let ((lighter (nth 1 spec)))
+            (unless (and (consp mode-name)
+                         (symbolp (car mode-name))
+                         (memq (car mode-name) '(hud-modeline-inhibit-major-mode delight-mode-name-inhibit)))
+              (setq-local mode-name `(delight-mode-name-inhibit ,mode-name ,lighter)))))))))
 
 (defun hud-modeline--apply-minor-lighter (mode value)
   "Apply VALUE as the lighter for minor MODE in `minor-mode-alist'."
@@ -484,15 +500,23 @@ When SPEC is a list of specifications, VALUE and FILE are ignored."
                 (hud-modeline--apply-minor-lighter mode value)
               (eval-after-load target
                 `(when (bound-and-true-p hud-modeline-mode)
-                   (hud-modeline--apply-minor-lighter ',mode ',value))))))))))
+                   (hud-modeline--apply-minor-lighter ',mode ',value))))))))
+    (dolist (buf (buffer-list))
+      (hud-modeline--apply-major-mode-name buf))))
 
 (defun hud-modeline--restore-lighters ()
-  "Restore original minor mode lighters when `hud-modeline-mode' is disabled."
+  "Restore original minor mode lighters and mode-name when `hud-modeline-mode' is disabled."
   (map-do (lambda (mode orig-val)
             (when-let* ((cell (assq mode minor-mode-alist)))
               (setcar (cdr cell) orig-val)))
           hud-modeline--saved-minor-lighters)
-  (clrhash hud-modeline--saved-minor-lighters))
+  (clrhash hud-modeline--saved-minor-lighters)
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (when (and (consp mode-name)
+                 (symbolp (car mode-name))
+                 (memq (car mode-name) '(hud-modeline-inhibit-major-mode delight-mode-name-inhibit)))
+        (setq-local mode-name (cadr mode-name))))))
 
 (defalias 'hud-modeline--init-delight #'hud-modeline--init-lighters)
 
@@ -1255,11 +1279,13 @@ annotations show [on]/[off], name, and description."
         (add-hook 'enable-theme-functions #'hud-modeline--on-theme-enable)
         (add-hook 'after-make-frame-functions #'hud-modeline--on-make-frame)
         (add-hook 'after-change-major-mode-hook #'hud-modeline--invalidate-icon)
+        (add-hook 'after-change-major-mode-hook #'hud-modeline--apply-major-mode-name)
         (add-hook 'compilation-start-hook #'hud-modeline--on-compilation-start)
         (add-hook 'compilation-finish-functions #'hud-modeline--on-compilation-finish))
     (remove-hook 'enable-theme-functions #'hud-modeline--on-theme-enable)
     (remove-hook 'after-make-frame-functions #'hud-modeline--on-make-frame)
     (remove-hook 'after-change-major-mode-hook #'hud-modeline--invalidate-icon)
+    (remove-hook 'after-change-major-mode-hook #'hud-modeline--apply-major-mode-name)
     (remove-hook 'compilation-start-hook #'hud-modeline--on-compilation-start)
     (remove-hook 'compilation-finish-functions #'hud-modeline--on-compilation-finish)
     (hud-modeline--restore-lighters)
