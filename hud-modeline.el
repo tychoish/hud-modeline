@@ -302,16 +302,18 @@ Handles configured names in `hud-modeline-lighter-specs' when
   (let* ((spec (when (bound-and-true-p hud-modeline-mode)
                  (assq major-mode hud-modeline-lighter-specs)))
          (raw (if (and spec (eq (nth 2 spec) :major))
-                  (nth 1 spec)
+                  (let ((val (nth 1 spec)))
+                    (if (functionp val) (funcall val) val))
                 mode-name))
          (name (cond
                 ((stringp raw) raw)
                 ((and (listp raw) (= (length raw) 3))
-                 (if (and (symbolp (car raw))
-                          (boundp (car raw))
-                          (symbol-value (car raw)))
-                     (nth 1 raw)
-                   (nth 2 raw)))
+                 (let ((val (if (and (symbolp (car raw))
+                                     (boundp (car raw))
+                                     (symbol-value (car raw)))
+                                (nth 1 raw)
+                              (nth 2 raw))))
+                   (if (functionp val) (funcall val) val)))
                 (t raw))))
     (if (and (stringp name) (> (length name) hud-modeline-mode-max-length))
         (concat (substring name 0 (1- hud-modeline-mode-max-length)) "…")
@@ -518,15 +520,27 @@ Called when `hud-modeline-mode' is disabled."
 (defvar hud-modeline--action-keymaps nil
   "Alist mapping segment key symbol to its mouse-1 keymap.")
 
+(defvar hud-modeline--action-help-echos nil
+  "Alist mapping segment key symbol to its custom help-echo tooltip.")
+
 ;;;###autoload
-(defun hud-modeline-set-segment-action (key command)
+(defun hud-modeline-set-segment-action (key command &optional help-echo)
   "Attach COMMAND to mouse-1 clicks on segment KEY.
 Creates and caches a sparse keymap; segment bodies that call
 `hud-modeline--action-map' pick it up automatically.
+Optional HELP-ECHO sets the tooltip string or function for KEY.
 Replaces any previously registered action for KEY."
   (let ((map (make-sparse-keymap)))
     (define-key map [mode-line mouse-1] command)
-    (setf (map-elt hud-modeline--action-keymaps key) map)))
+    (setf (map-elt hud-modeline--action-keymaps key) map)
+    (when help-echo
+      (setf (map-elt hud-modeline--action-help-echos key) help-echo))
+    map))
+
+(defun hud-modeline--action-help-echo (key &optional default)
+  "Return the registered help-echo for segment KEY, or DEFAULT."
+  (or (map-elt hud-modeline--action-help-echos key)
+      default))
 
 (defun hud-modeline--action-map (key)
   "Return the cached mouse-1 keymap for segment KEY, or a default map."
@@ -656,15 +670,23 @@ present in FROM-VAR."
  :description "File-type icon (nerd-icons)"
  :body (when (and hud-modeline-icons
                   (fboundp 'nerd-icons-icon-for-buffer))
-         (cond
-          ((eq hud-modeline--icon-cache 'none) nil)
-          (hud-modeline--icon-cache hud-modeline--icon-cache)
-          (t
-           (let ((icon (condition-case nil
-                           (nerd-icons-icon-for-buffer)
-                         (error nil))))
-             (setq hud-modeline--icon-cache (or icon 'none))
-             icon)))))
+         (let ((raw (cond
+                     ((eq hud-modeline--icon-cache 'none) nil)
+                     (hud-modeline--icon-cache hud-modeline--icon-cache)
+                     (t
+                      (let ((icon (condition-case nil
+                                      (nerd-icons-icon-for-buffer)
+                                    (error nil))))
+                        (setq hud-modeline--icon-cache (or icon 'none))
+                        icon)))))
+           (when (stringp raw)
+             (if-let* ((km (hud-modeline--action-map 'icon)))
+                 (propertize raw
+                             'local-map km
+                             'mouse-face 'mode-line-highlight
+                             'help-echo (hud-modeline--action-help-echo
+                                         'icon "mouse-1: buffer icon action"))
+               raw)))))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-left-segments
@@ -786,7 +808,8 @@ present in FROM-VAR."
          (concat (propertize (concat "[" sprite-instance-id "]")
                              'local-map (hud-modeline--action-map 'instance)
                              'mouse-face 'mode-line-highlight
-                             'help-echo "mouse-1: sprite list")
+                             'help-echo (hud-modeline--action-help-echo
+                                         'instance "mouse-1: sprite list"))
                  " ")))
 
 (hud-modeline-add-segment
@@ -864,7 +887,8 @@ present in FROM-VAR."
                 (propertize branch
                             'local-map km
                             'mouse-face 'mode-line-highlight
-                            'help-echo "mouse-1: vc dispatch")
+                            'help-echo (hud-modeline--action-help-echo
+                                        'vc "mouse-1: vc dispatch"))
               branch)
             " "))))
 
@@ -883,7 +907,8 @@ present in FROM-VAR."
                              'face 'mode-line-buffer-id
                              'local-map (hud-modeline--action-map 'projectile)
                              'mouse-face 'mode-line-highlight
-                             'help-echo "mouse-1: projectile dispatch")
+                             'help-echo (hud-modeline--action-help-echo
+                                         'projectile "mouse-1: projectile dispatch"))
                  " ")))
 
 (declare-function sprite-desktop--indicator-string "sprite-desktop")
@@ -944,7 +969,8 @@ present in FROM-VAR."
                   (propertize rendered
                               'local-map km
                               'mouse-face 'mode-line-highlight
-                              'help-echo "mouse-1: diff-review overview")
+                              'help-echo (hud-modeline--action-help-echo
+                                          'review "mouse-1: diff-review overview"))
                 rendered)
               " ")))))
 

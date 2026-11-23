@@ -108,6 +108,16 @@ inhibit bindings."
     (should (equal '("el" (lexical-binding ":l" ":d"))
                    (hud-modeline--major-mode)))))
 
+(ert-deftest hud-modeline--major-mode-function-lighter ()
+  "`hud-modeline--major-mode' evaluates a function lighter in `hud-modeline-lighter-specs'."
+  (let ((hud-modeline-mode t)
+        (hud-modeline-lighter-specs
+         `((emacs-lisp-mode ,(lambda () "custom-fn") :major))))
+    (with-temp-buffer
+      (setq-local major-mode 'emacs-lisp-mode)
+      (setq-local mode-name "Emacs-Lisp")
+      (should (equal "custom-fn" (hud-modeline--major-mode))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--render-segments
 ;;
@@ -281,6 +291,26 @@ ENABLED defaults to t when omitted."
       (should (keymapp map))
       (should (eq (lookup-key map [mode-line mouse-1]) #'ignore)))))
 
+(ert-deftest hud-modeline--action-map-icon-nil-by-default ()
+  "When no action is registered, 'icon action returns nil."
+  (let ((hud-modeline--action-keymaps nil))
+    (should-not (hud-modeline--action-map 'icon))))
+
+(ert-deftest hud-modeline--action-map-icon-honors-registered-action ()
+  "Explicitly registered 'icon action creates and returns the mouse-1 keymap."
+  (let ((hud-modeline--action-keymaps nil))
+    (hud-modeline-set-segment-action 'icon #'ignore)
+    (let ((map (hud-modeline--action-map 'icon)))
+      (should (keymapp map))
+      (should (eq (lookup-key map [mode-line mouse-1]) #'ignore)))))
+
+(ert-deftest hud-modeline--action-map-supports-custom-help-echo ()
+  "`hud-modeline-set-segment-action' stores and retrieves custom help-echo."
+  (let ((hud-modeline--action-keymaps nil)
+        (hud-modeline--action-help-echos nil))
+    (hud-modeline-set-segment-action 'icon #'ignore "custom tooltip")
+    (should (equal "custom tooltip" (hud-modeline--action-help-echo 'icon "default")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--pad
 
@@ -398,6 +428,34 @@ an unhandled error through the mode-line :eval form, silencing the entire modeli
                (lambda () (error "icon lookup failed"))))
       (hud-modeline--icon-segment)
       (should (eq 'none hud-modeline--icon-cache)))))
+
+(ert-deftest hud-modeline--icon-segment-attaches-action-map ()
+  "`hud-modeline--icon-segment' attaches local-map, mouse-face, and help-echo when action is set."
+  (let ((hud-modeline-icons t)
+        (hud-modeline--icon-cache nil)
+        (hud-modeline--action-keymaps nil)
+        (hud-modeline--action-help-echos nil))
+    (hud-modeline-set-segment-action 'icon #'ignore "icon tooltip")
+    (cl-letf (((symbol-function 'nerd-icons-icon-for-buffer)
+               (lambda () (copy-sequence ""))))
+      (let* ((rendered (hud-modeline--icon-segment))
+             (map (get-text-property 0 'local-map rendered)))
+        (should (equal rendered ""))
+        (should (keymapp map))
+        (should (eq (lookup-key map [mode-line mouse-1]) #'ignore))
+        (should (eq 'mode-line-highlight (get-text-property 0 'mouse-face rendered)))
+        (should (equal "icon tooltip" (get-text-property 0 'help-echo rendered)))))))
+
+(ert-deftest hud-modeline--icon-segment-no-action-map-by-default ()
+  "`hud-modeline--icon-segment' does not attach local-map when no action is registered."
+  (let ((hud-modeline-icons t)
+        (hud-modeline--icon-cache nil)
+        (hud-modeline--action-keymaps nil))
+    (cl-letf (((symbol-function 'nerd-icons-icon-for-buffer)
+               (lambda () (copy-sequence ""))))
+      (let ((rendered (hud-modeline--icon-segment)))
+        (should (equal rendered ""))
+        (should-not (get-text-property 0 'local-map rendered))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--debug-segment
