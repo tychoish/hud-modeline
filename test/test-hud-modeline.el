@@ -673,6 +673,52 @@ not a flag-toggling command."
           (should (equal (cadr (assq 'abbrev-mode minor-mode-alist)) " Abbrev")))
       (hud-modeline-mode -1))))
 
+(ert-deftest hud-modeline--string-keyed-major-mode-rename ()
+  "String-keyed `:major' specs shorten dynamic `mode-name' values."
+  (let ((hud-modeline-lighter-specs '(("Antigravity" "agy" :major))))
+    (unwind-protect
+        (with-temp-buffer
+          (setq-local major-mode 'fundamental-mode)
+          (setq-local mode-name "Antigravity")
+          (hud-modeline-mode 1)
+          (should (equal "agy" (hud-modeline--major-mode)))
+          (should (equal '(hud-modeline-inhibit-major-mode "Antigravity" "agy")
+                         mode-name))
+          (let ((hud-modeline-inhibit-major-mode t))
+            (should (equal "Antigravity" (hud-modeline--major-mode))))
+          (hud-modeline-set-lighter "Antigravity" "AGY" :major)
+          (should (equal "AGY" (hud-modeline--major-mode)))
+          (hud-modeline-remove-lighter "Antigravity")
+          (should (equal "Antigravity" mode-name)))
+      (hud-modeline-mode -1))))
+
+(ert-deftest hud-modeline--default-specs-shorten-agent-shell ()
+  "Default specs shorten Antigravity and hide ask-steering and overmark."
+  (should (equal '("Antigravity" "agy" :major)
+                 (assoc "Antigravity" hud-modeline-lighter-specs)))
+  (should (equal '(agent-shell-queue-ask-steering-mode nil agent-shell-queue-overload)
+                 (assq 'agent-shell-queue-ask-steering-mode hud-modeline-lighter-specs)))
+  (should (equal '(overmark-mode nil overmark)
+                 (assq 'overmark-mode hud-modeline-lighter-specs))))
+
+(ert-deftest hud-modeline--after-load-reapplies-minor-lighters ()
+  "Reloading a mode file re-applies elided minor lighters while keeping saved originals."
+  (let ((minor-mode-alist (list (list 'overmark-mode " Overmark")))
+        (hud-modeline-lighter-specs '((overmark-mode nil overmark))))
+    (unwind-protect
+        (progn
+          (hud-modeline-mode 1)
+          (should (memq #'hud-modeline--on-after-load after-load-functions))
+          (should-not (cadr (assq 'overmark-mode minor-mode-alist)))
+          ;; Simulate reloading the package resetting minor-mode-alist
+          (setcar (cdr (assq 'overmark-mode minor-mode-alist)) " Overmark")
+          (hud-modeline--on-after-load "overmark.el")
+          (should-not (cadr (assq 'overmark-mode minor-mode-alist)))
+          (hud-modeline-mode -1)
+          (should (equal " Overmark" (cadr (assq 'overmark-mode minor-mode-alist))))
+          (should-not (memq #'hud-modeline--on-after-load after-load-functions)))
+      (hud-modeline-mode -1))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--review-segment
 
