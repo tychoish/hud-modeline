@@ -19,6 +19,8 @@
 (defvar projectile-mode nil)
 (defvar hud-modeline--test-inhibit nil
   "Dynamically bound sentinel for mode-line conditional tests.")
+(defvar hud-modeline--test-global-sym nil
+  "Dynamically bound sentinel for global-mode-string tests.")
 
 (ert-deftest hud-modeline--format-mode-line-cond-nil-returns-empty ()
   "format-mode-line (COND THEN): returns empty string when COND is nil."
@@ -255,6 +257,19 @@ ENABLED defaults to t when omitted."
         (should-not (string-search "sprite-desktop--indicator-string" misc))
         (should (string-search "battery" misc))))))
 
+(ert-deftest hud-modeline--misc-renders-symbol-global-mode-entry ()
+  "A symbol entry in `global-mode-string' stays directly under \"\" after exclusion."
+  (let* ((hud-modeline--test-global-sym '(:eval "quota 1m"))
+         (global-mode-string '((:eval (sprite-desktop--indicator-string))
+                               hud-modeline--test-global-sym))
+         (mode-line-misc-info '((global-mode-string ("" global-mode-string))))
+         (hud-modeline-show-org-title nil))
+    (put 'hud-modeline--test-global-sym 'risky-local-variable t)
+    (should (equal '((global-mode-string ("" hud-modeline--test-global-sym)))
+                   (hud-modeline--misc-entries)))
+    (unless noninteractive
+      (should (equal "quota 1m" (hud-modeline--misc-segment))))))
+
 (ert-deftest hud-modeline--desktop-uses-small-indicator ()
   "The desktop segment replaces the tall hourglass while preserving progress."
   (cl-letf (((symbol-function 'sprite-desktop--indicator-string)
@@ -329,6 +344,23 @@ ENABLED defaults to t when omitted."
 (ert-deftest hud-modeline--pad-no-double-trailing-space ()
   "hud-modeline--pad does not add a second trailing space."
   (should (equal "foo " (hud-modeline--pad "foo " nil))))
+
+(ert-deftest hud-modeline--escape-percent-preserves-properties ()
+  "Escaping `%' doubles percent signs and preserves text properties."
+  (let* ((km (make-sparse-keymap))
+         (input (concat (propertize "91%" 'face 'success 'local-map km)
+                        (propertize "/" 'local-map km)
+                        (propertize "22%" 'face 'warning 'local-map km)))
+         (escaped (hud-modeline--escape-percent input)))
+    (should (equal (substring-no-properties escaped) "91%%/22%%"))
+    (should (eq (get-text-property 2 'face escaped) 'success))
+    (should (eq (get-text-property 3 'local-map escaped) km))
+    (should (eq (get-text-property 7 'face escaped) 'warning))
+    (should (equal " 91%%/22%%" (hud-modeline--pad input t)))
+    (unless noninteractive
+      (should (equal "91%/22%"
+                     (substring-no-properties
+                      (format-mode-line `((:eval ,escaped)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--buffer-name

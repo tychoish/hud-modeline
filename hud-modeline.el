@@ -218,7 +218,7 @@ Matched with `equal'; use this to hide an item or give it its own segment."
   (seq-map (lambda (entry)
              (if (and (consp entry) (eq (car entry) 'global-mode-string))
                  (list 'global-mode-string
-                       (list "" (seq-remove
+                       (cons "" (seq-remove
                                  (lambda (e) (member e hud-modeline-misc-excluded-entries))
                                  (ensure-list global-mode-string))))
                entry))
@@ -1048,11 +1048,28 @@ Each string is trimmed before joining to prevent double spaces."
      (seq-remove #'string-empty-p))
    " "))
 
+(defun hud-modeline--escape-percent (str)
+  "Escape literal `%' as `%%' in STR while preserving text properties."
+  (if (not (string-search "%" str))
+      str
+    (let ((parts nil)
+          (start 0)
+          (pos nil))
+      (while (setq pos (string-search "%" str start))
+        (when (> pos start)
+          (push (substring str start pos) parts))
+        (push (apply #'propertize "%%" (text-properties-at pos str)) parts)
+        (setq start (1+ pos)))
+      (when (< start (length str))
+        (push (substring str start) parts))
+      (apply #'concat (nreverse parts)))))
+
 (defun hud-modeline--pad (s prefix)
-  "Ensure S has a single space at the PREFIX end (t=left, nil=right)."
-  (if prefix
-      (if (string-prefix-p " " s) s (concat " " s))
-    (if (string-suffix-p " " s) s (concat s " "))))
+  "Escape `%' in S and ensure a single space at PREFIX end (t=left, nil=right)."
+  (let ((escaped (hud-modeline--escape-percent s)))
+    (if prefix
+        (if (string-prefix-p " " escaped) escaped (concat " " escaped))
+      (if (string-suffix-p " " escaped) escaped (concat escaped " ")))))
 
 (defun hud-modeline--left ()
   "Render the left side of the mode-line with a leading space."
