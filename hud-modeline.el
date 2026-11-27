@@ -54,6 +54,7 @@
 (declare-function nerd-icons-codicon "nerd-icons")
 (declare-function nerd-icons-octicon "nerd-icons")
 (declare-function nerd-icons-icon-for-buffer "nerd-icons")
+(declare-function nerd-icons-icon-for-mode "nerd-icons" (mode &rest arg-overrides))
 (declare-function projectile-project-name "projectile")
 (declare-function projectile-project-root "projectile")
 (declare-function mouse-menu-major-mode-map "mouse")
@@ -64,6 +65,22 @@
 
 (declare-function mouse-buffer-menu "mouse")
 (declare-function annotated-completing-read "annotated-completing-read")
+(declare-function agent-shell-quota "agent-shell-quota" ())
+(declare-function agent-shell-quota-dispatch "agent-shell-quota" ())
+(declare-function agent-shell-quota--mode-line-segment "agent-shell-quota" ())
+(declare-function agent-shell-quota-buffer-segment "agent-shell-quota" ())
+(declare-function agent-shell-queue-buffer-open "agent-shell-queue-ui" ())
+(declare-function agent-shell-menu-dispatch "agent-shell-menu" ())
+(declare-function denote-dash "denote-dash" ())
+(declare-function denote-dash-dispatch "denote-dash" ())
+(declare-function magit-dash-open "magit-dash" ())
+(declare-function magit-dash-dispatch "magit-dash-status" ())
+(declare-function orgx-agenda-view "orgx" ())
+(declare-function org-agenda "org-agenda" (&optional arg org-keys restriction))
+(declare-function orgx-capture "orgx-capture" (&optional goto keys))
+(declare-function orgx-capture-shell-toggle "orgx-capture-shell" ())
+(declare-function logx-view-popup "logx-view" (&optional buffer-name))
+(declare-function logx-show-logs "logx-view" (&optional buffer-name))
 
 ;;;; Customization
 
@@ -211,7 +228,8 @@ Any combination of:
 ;; Entries removed from the misc segment, so they can be shown (and toggled)
 ;; as their own segments.
 (defcustom hud-modeline-misc-excluded-entries
-  '((:eval (sprite-desktop--indicator-string)))
+  '((:eval (sprite-desktop--indicator-string))
+    agent-shell-quota--mode-line)
   "Entries of `global-mode-string' omitted from the misc segment.
 Matched with `equal'; use this to hide an item or give it its own segment."
   :type '(repeat sexp)
@@ -693,6 +711,15 @@ present in FROM-VAR."
            (propertize "!" 'face 'hud-modeline-modified)))
         (t nil)))
 
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-left-segments
+ :key 'agent-quota
+ :name "Agent Quota"
+ :description "Remaining quota for the current agent-shell provider"
+ :place-after 'state
+ :body (when (fboundp 'agent-shell-quota-buffer-segment)
+         (agent-shell-quota-buffer-segment)))
+
 ;; hud-modeline--icon-cache: nil=not yet checked, 'none=failed/absent, STRING=cached icon
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-left-segments
@@ -805,12 +832,144 @@ present in FROM-VAR."
 
 ;;;; Integration segment registration
 
+(defun hud-modeline--icon-button (icon-name fallback mouse-1 &optional mouse-3 help-echo icon-fn)
+  "Return a clickable mode-line button using ICON-NAME or FALLBACK string.
+MOUSE-1 and optional MOUSE-3 are bound on the mode line; HELP-ECHO sets
+the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
+  (let* ((fn (or icon-fn #'nerd-icons-codicon))
+         (label (or (when (and hud-modeline-icons (fboundp fn))
+                      (ignore-errors (funcall fn icon-name)))
+                    fallback))
+         (map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] mouse-1)
+    (when mouse-3
+      (define-key map [mode-line mouse-3] mouse-3))
+    (propertize label
+                'local-map map
+                'mouse-face 'mode-line-highlight
+                'help-echo help-echo)))
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'magit-dash
+ :name "Magit Dash"
+ :description "Clickable magit-dash button (icon or MD fallback)"
+ :place-after 'misc
+ :body (when (fboundp 'magit-dash-open)
+         (hud-modeline--icon-button
+          "nf-cod-source_control" "MD"
+          #'magit-dash-open
+          (when (fboundp 'magit-dash-dispatch)
+            #'magit-dash-dispatch)
+          "mouse-1: Magit dashboard; mouse-3: Magit dash menu")))
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'denote-dash
+ :name "Denote Dash"
+ :description "Clickable denote-dash button (icon or DD fallback)"
+ :place-after 'magit-dash
+ :body (when (fboundp 'denote-dash)
+         (hud-modeline--icon-button
+          "nf-cod-notebook" "DD"
+          #'denote-dash
+          (when (fboundp 'denote-dash-dispatch)
+            #'denote-dash-dispatch)
+          "mouse-1: Denote dashboard; mouse-3: Denote dash menu")))
+
+(defun hud-modeline--switch-recent-agenda-buffer ()
+  "Switch to the most recently used `org-agenda-mode' buffer, or open agenda ACR."
+  (interactive)
+  (if-let* ((buf (seq-find (lambda (b)
+                             (with-current-buffer b
+                               (derived-mode-p 'org-agenda-mode)))
+                           (buffer-list))))
+      (pop-to-buffer buf)
+    (if (fboundp 'orgx-agenda-view)
+        (call-interactively #'orgx-agenda-view)
+      (call-interactively #'org-agenda))))
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'org-agenda
+ :name "Org Agenda"
+ :description "Clickable org-agenda button in Org buffers (org-mode icon or OA fallback)"
+ :place-after 'denote-dash
+ :body (when (and (derived-mode-p 'org-mode 'org-agenda-mode)
+                  (or (fboundp 'orgx-agenda-view)
+                      (fboundp 'org-agenda)))
+         (hud-modeline--icon-button
+          'org-mode "OA"
+          (if (fboundp 'orgx-agenda-view)
+              #'orgx-agenda-view
+            #'org-agenda)
+          #'hud-modeline--switch-recent-agenda-buffer
+          "mouse-1: Agenda views; mouse-3: Recent agenda buffer"
+          #'nerd-icons-icon-for-mode)))
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'org-capture
+ :name "Org Capture"
+ :description "Clickable org-capture selector button (icon or OC fallback)"
+ :place-after 'org-agenda
+ :body (when (or (fboundp 'orgx-capture)
+                 (fboundp 'org-capture))
+         (hud-modeline--icon-button
+          "nf-cod-edit" "OC"
+          (if (fboundp 'orgx-capture)
+              #'orgx-capture
+            #'org-capture)
+          (when (fboundp 'orgx-capture-shell-toggle)
+            #'orgx-capture-shell-toggle)
+          "mouse-1: Org capture; mouse-3: Capture shell")))
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'quota
+ :name "Quota"
+ :description "Clickable subscription quota report indicator (icon or AQ fallback)"
+ :place-after 'org-capture
+ :body (when (fboundp 'agent-shell-quota)
+         (hud-modeline--icon-button
+          "nf-cod-dashboard" "AQ"
+          #'agent-shell-quota #'agent-shell-quota-dispatch
+          (or (when (fboundp 'agent-shell-quota--mode-line-segment)
+                (get-text-property 0 'help-echo (agent-shell-quota--mode-line-segment)))
+              "mouse-1: Quota report; mouse-3: Quota menu"))))
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'agent-queue
+ :name "Agent Queue"
+ :description "Clickable agent-shell-queue indicator (icon or ASQ fallback)"
+ :place-after 'quota
+ :body (when (fboundp 'agent-shell-queue-buffer-open)
+         (hud-modeline--icon-button
+          "nf-cod-list_ordered" "ASQ"
+          #'agent-shell-queue-buffer-open
+          (when (fboundp 'agent-shell-menu-dispatch)
+            #'agent-shell-menu-dispatch)
+          "mouse-1: Open agent-shell-queue; mouse-3: Agent shell menu")))
+
+(hud-modeline-add-segment
+ :segment-block 'hud-modeline-right-segments
+ :key 'logx
+ :name "Logx"
+ :description "Clickable indicator to pop up the logx event viewer"
+ :place-after 'agent-queue
+ :body (when (fboundp 'logx-view-popup)
+         (hud-modeline--icon-button
+          "nf-cod-gear" "LGX"
+          #'logx-view-popup #'logx-show-logs
+          "mouse-1: Logx popup; mouse-3: Open *logs*")))
+
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-right-segments
  :key 'anzu
  :name "Anzu"
  :description "Search match index"
- :place-after 'misc
+ :place-after 'logx
  :body (when (and (bound-and-true-p anzu--state)
                   (not (bound-and-true-p iedit-mode)))
          (let ((here anzu--current-position)
