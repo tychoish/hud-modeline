@@ -334,6 +334,9 @@ any other non-nil value is the cached icon string.")
   "Invalidate the icon cache when the major mode changes."
   (setq hud-modeline--icon-cache nil))
 
+(defvar hud-modeline-inhibit-major-mode nil
+  "When non-nil, the original `mode-name' is displayed instead of the lighter.")
+
 (defun hud-modeline--original-major-mode-name ()
   "Return the underlying `mode-name' before `hud-modeline' wrapping."
   (if (and (consp mode-name)
@@ -447,9 +450,6 @@ Use `hud-modeline-enable-segment' to re-enable."
     (setf (hud-modeline-segment-enabled seg) t)))
 
 ;;;; Lighter management API
-
-(defvar hud-modeline-inhibit-major-mode nil
-  "When non-nil, the original `mode-name' is displayed instead of the lighter.")
 
 (defvar hud-modeline--saved-minor-lighters (make-hash-table :test #'eq)
   "Hash table mapping minor mode symbols to their original lighters.")
