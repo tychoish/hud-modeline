@@ -71,6 +71,7 @@
 (declare-function agent-shell-quota-buffer-segment "agent-shell-quota" ())
 (declare-function agent-shell-queue-buffer-open "agent-shell-queue-ui" ())
 (declare-function agent-shell-menu-dispatch "agent-shell-menu" ())
+(declare-function agent-shell-help-menu "agent-shell" ())
 (declare-function denote-dash "denote-dash" ())
 (declare-function denote-dash-dispatch "denote-dash" ())
 (declare-function magit-dash-open "magit-dash" ())
@@ -79,6 +80,7 @@
 (declare-function org-agenda "org-agenda" (&optional arg org-keys restriction))
 (declare-function orgx-capture "orgx-capture" (&optional goto keys))
 (declare-function orgx-capture-shell-toggle "orgx-capture-shell" ())
+(declare-function orgx-capture-shell-transient "orgx-capture-shell" ())
 (declare-function logx-view-popup "logx-view" (&optional buffer-name))
 (declare-function logx-show-logs "logx-view" (&optional buffer-name))
 
@@ -607,6 +609,44 @@ Replaces any previously registered action for KEY."
   (or (map-elt hud-modeline--action-help-echos key)
       default))
 
+(defcustom hud-modeline-icon-mode-menus
+  '((agent-shell-mode
+     (agent-shell-menu-dispatch agent-shell-help-menu)
+     "Agent-shell menu")
+    (orgx-capture-shell-mode
+     (orgx-capture-shell-transient)
+     "Capture-shell menu"))
+  "Alist mapping major-mode symbols to mode-line icon menu actions.
+Each entry has the form `(MODE COMMANDS TOOLTIP)', where MODE is a
+major-mode symbol tested with `derived-mode-p', COMMANDS is a symbol or
+list of candidate command symbols (the first `fboundp' symbol is called
+interactively), and TOOLTIP is the hover string."
+  :type '(repeat (list (symbol :tag "Major mode")
+                       (choice symbol (repeat symbol))
+                       (string :tag "Tooltip")))
+  :group 'hud-modeline)
+
+(defun hud-modeline--icon-mode-menu-entry ()
+  "Return `(COMMAND . TOOLTIP)' for the current buffer's mode, or nil."
+  (seq-some
+   (lambda (entry)
+     (when (derived-mode-p (car entry))
+       (when-let* ((cmd (seq-find #'fboundp (ensure-list (nth 1 entry)))))
+         (cons cmd (nth 2 entry)))))
+   hud-modeline-icon-mode-menus))
+
+;;;###autoload
+(defun hud-modeline-icon-dispatch ()
+  "Raise the context-sensitive menu for the current buffer's mode."
+  (interactive)
+  (if-let* ((entry (hud-modeline--icon-mode-menu-entry)))
+      (call-interactively (car entry))
+    (message "No modeline menu for %s" major-mode)))
+
+(defun hud-modeline-icon-help-echo (&rest _args)
+  "Return the tooltip string for the current buffer's mode-line icon."
+  (cdr (hud-modeline--icon-mode-menu-entry)))
+
 (defun hud-modeline--action-map (key)
   "Return the cached mouse-1 keymap for segment KEY, or a default map."
   (or (map-elt hud-modeline--action-keymaps key)
@@ -760,7 +800,15 @@ present in FROM-VAR."
                              'mouse-face 'mode-line-highlight
                              'help-echo (hud-modeline--action-help-echo
                                          'icon "Buffer action"))
-               raw)))))
+               (if-let* ((entry (hud-modeline--icon-mode-menu-entry))
+                         (map (make-sparse-keymap)))
+                   (progn
+                     (define-key map [mode-line mouse-1] #'hud-modeline-icon-dispatch)
+                     (propertize raw
+                                 'local-map map
+                                 'mouse-face 'mode-line-highlight
+                                 'help-echo (cdr entry)))
+                 raw))))))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-left-segments

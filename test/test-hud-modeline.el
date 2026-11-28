@@ -663,6 +663,38 @@ an unhandled error through the mode-line :eval form, silencing the entire modeli
         (should (equal rendered ""))
         (should-not (get-text-property 0 'local-map rendered))))))
 
+(ert-deftest hud-modeline--icon-segment-mode-menus ()
+  "Mode-specific icon menus attach dispatch and tooltip in matching modes."
+  (let ((hud-modeline-icons t)
+        (hud-modeline--icon-cache nil)
+        (hud-modeline--action-keymaps nil)
+        (hud-modeline--action-help-echos nil)
+        called)
+    (cl-letf (((symbol-function 'nerd-icons-icon-for-buffer)
+               (lambda () (copy-sequence "ICON")))
+              ((symbol-function 'agent-shell-help-menu)
+               (lambda () (interactive) (setq called 'agent-help)))
+              ((symbol-function 'orgx-capture-shell-transient)
+               (lambda () (interactive) (setq called 'capture))))
+      (with-temp-buffer
+        (setq major-mode 'agent-shell-mode)
+        (let* ((rendered (hud-modeline--icon-segment))
+               (map (get-text-property 0 'local-map rendered)))
+          (should (eq (lookup-key map [mode-line mouse-1]) #'hud-modeline-icon-dispatch))
+          (should (equal (get-text-property 0 'help-echo rendered) "Agent-shell menu"))
+          (should (equal (hud-modeline-icon-help-echo) "Agent-shell menu"))
+          (hud-modeline-icon-dispatch)
+          (should (eq called 'agent-help))))
+      (setq hud-modeline--icon-cache nil)
+      (with-temp-buffer
+        (setq major-mode 'orgx-capture-shell-mode)
+        (let* ((rendered (hud-modeline--icon-segment))
+               (map (get-text-property 0 'local-map rendered)))
+          (should (eq (lookup-key map [mode-line mouse-1]) #'hud-modeline-icon-dispatch))
+          (should (equal (get-text-property 0 'help-echo rendered) "Capture-shell menu"))
+          (hud-modeline-icon-dispatch)
+          (should (eq called 'capture)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; hud-modeline--debug-segment
 
