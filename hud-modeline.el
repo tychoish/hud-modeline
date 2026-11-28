@@ -74,7 +74,7 @@
 (declare-function denote-dash "denote-dash" ())
 (declare-function denote-dash-dispatch "denote-dash" ())
 (declare-function magit-dash-open "magit-dash" ())
-(declare-function magit-dash-dispatch "magit-dash-status" ())
+(declare-function magit-dash-open-registered-repo "magit-dash" ())
 (declare-function orgx-agenda-view "orgx" ())
 (declare-function org-agenda "org-agenda" (&optional arg org-keys restriction))
 (declare-function orgx-capture "orgx-capture" (&optional goto keys))
@@ -759,7 +759,7 @@ present in FROM-VAR."
                              'local-map km
                              'mouse-face 'mode-line-highlight
                              'help-echo (hud-modeline--action-help-echo
-                                         'icon "mouse-1: buffer icon action"))
+                                         'icon "Buffer action"))
                raw)))))
 
 (hud-modeline-add-segment
@@ -781,7 +781,7 @@ present in FROM-VAR."
 		     (define-key map [mode-line mouse-3] #'mouse-buffer-menu)
 		     map)
         'mouse-face 'mode-line-highlight
-        'help-echo "mouse-1: next buffer\nmouse-3: buffer menu"))
+        'help-echo "Next buffer\n[buffer menu]"))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-left-segments
@@ -820,7 +820,7 @@ present in FROM-VAR."
 									 #'mouse-major-mode-menu))
 					    map)
                                'mouse-face 'mode-line-highlight
-                               'help-echo "mouse-1: mode menu\nmouse-2: describe mode")
+                               'help-echo "Major mode menu\n[describe mode]")
                  major)))
          (format-mode-line
           `("%[" "(" ,major-display
@@ -891,9 +891,9 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
          (hud-modeline--icon-button
           "nf-cod-source_control" "MD"
           #'magit-dash-open
-          (when (fboundp 'magit-dash-dispatch)
-            #'magit-dash-dispatch)
-          "mouse-1: Magit dashboard; mouse-3: Magit dash menu")))
+          (when (fboundp 'magit-dash-open-registered-repo)
+            #'magit-dash-open-registered-repo)
+          "Magit dashboard\n[open registered repo]")))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-right-segments
@@ -907,7 +907,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
           #'denote-dash
           (when (fboundp 'denote-dash-dispatch)
             #'denote-dash-dispatch)
-          "mouse-1: Denote dashboard; mouse-3: Denote dash menu")))
+          "Denote dashboard\n[dispatch menu]")))
 
 (defun hud-modeline--switch-recent-agenda-buffer ()
   "Switch to the most recently used `org-agenda-mode' buffer, or open agenda ACR."
@@ -936,7 +936,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
               #'orgx-agenda-view
             #'org-agenda)
           #'hud-modeline--switch-recent-agenda-buffer
-          "mouse-1: Agenda views; mouse-3: Recent agenda buffer"
+          "Org agenda views\n[recent agenda]"
           #'nerd-icons-icon-for-mode)))
 
 (hud-modeline-add-segment
@@ -945,16 +945,23 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
  :name "Org Capture"
  :description "Clickable org-capture selector button (icon or OC fallback)"
  :place-after 'org-agenda
- :body (when (or (fboundp 'orgx-capture)
+ :body (when (or (fboundp 'orgx-capture-shell-toggle)
+                 (fboundp 'orgx-capture)
                  (fboundp 'org-capture))
-         (hud-modeline--icon-button
-          "nf-cod-edit" "OC"
-          (if (fboundp 'orgx-capture)
-              #'orgx-capture
-            #'org-capture)
-          (when (fboundp 'orgx-capture-shell-toggle)
-            #'orgx-capture-shell-toggle)
-          "mouse-1: Org capture; mouse-3: Capture shell")))
+         (let ((capture-fn (if (fboundp 'orgx-capture)
+                               #'orgx-capture
+                             #'org-capture)))
+           (if (fboundp 'orgx-capture-shell-toggle)
+               (hud-modeline--icon-button
+                "nf-cod-edit" "OC"
+                #'orgx-capture-shell-toggle
+                capture-fn
+                "Capture shell\n[capture ACR]")
+             (hud-modeline--icon-button
+              "nf-cod-edit" "OC"
+              capture-fn
+              nil
+              "Org capture")))))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-right-segments
@@ -966,9 +973,12 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
          (hud-modeline--icon-button
           "nf-cod-dashboard" "AQ"
           #'agent-shell-quota #'agent-shell-quota-dispatch
-          (or (when (fboundp 'agent-shell-quota--mode-line-segment)
-                (get-text-property 0 'help-echo (agent-shell-quota--mode-line-segment)))
-              "mouse-1: Quota report; mouse-3: Quota menu"))))
+          (or (when-let* (((fboundp 'agent-shell-quota--mode-line-segment))
+                          (seg (agent-shell-quota--mode-line-segment))
+                          ((stringp seg))
+                          ((not (string-empty-p seg))))
+                (get-text-property 0 'help-echo seg))
+              "Agent quota report\n[quota menu]"))))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-right-segments
@@ -982,7 +992,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
           #'agent-shell-queue-buffer-open
           (when (fboundp 'agent-shell-menu-dispatch)
             #'agent-shell-menu-dispatch)
-          "mouse-1: Open agent-shell-queue; mouse-3: Agent shell menu")))
+          "Agent-shell queue\n[menu]")))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-right-segments
@@ -994,7 +1004,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
          (hud-modeline--icon-button
           "nf-cod-gear" "LGX"
           #'logx-view-popup #'logx-show-logs
-          "mouse-1: Logx popup; mouse-3: Open *logs*")))
+          "Logx event popup\n[*logs* buffer]")))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-right-segments
@@ -1031,7 +1041,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
                              'local-map (hud-modeline--action-map 'instance)
                              'mouse-face 'mode-line-highlight
                              'help-echo (hud-modeline--action-help-echo
-                                         'instance "mouse-1: sprite list"))
+                                         'instance "Sprite instances"))
                  " ")))
 
 (hud-modeline-add-segment
@@ -1110,7 +1120,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
                             'local-map km
                             'mouse-face 'mode-line-highlight
                             'help-echo (hud-modeline--action-help-echo
-                                        'vc "mouse-1: vc dispatch"))
+                                        'vc "Magit dispatch"))
               branch)
             " "))))
 
@@ -1130,7 +1140,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
                              'local-map (hud-modeline--action-map 'projectile)
                              'mouse-face 'mode-line-highlight
                              'help-echo (hud-modeline--action-help-echo
-                                         'projectile "mouse-1: projectile dispatch"))
+                                         'projectile "Projectile dispatch"))
                  " ")))
 
 (declare-function sprite-desktop--indicator-string "sprite-desktop")
@@ -1192,7 +1202,7 @@ the tooltip; ICON-FN defaults to `nerd-icons-codicon'."
                               'local-map km
                               'mouse-face 'mode-line-highlight
                               'help-echo (hud-modeline--action-help-echo
-                                          'review "mouse-1: diff-review overview"))
+                                          'review "Diff-review overview"))
                 rendered)
               " ")))))
 
@@ -1243,11 +1253,11 @@ tooltip text.  Clicking with mouse-1 raises the *Backtrace* buffer via
                                  (when debug-on-error
                                    (hud-modeline--debug-flag-icon
                                     "nf-cod-bug" "bug" 'hud-modeline-error
-                                    "debug-on-error active\nmouse-1: raise *Backtrace*"))
+                                    "debug-on-error active\n[raise *Backtrace*]"))
                                  (when debug-on-quit
                                    (hud-modeline--debug-flag-icon
                                     "nf-cod-debug_pause" "quit" 'hud-modeline-warning
-                                    "debug-on-quit active\nmouse-1: raise *Backtrace*"))))))
+                                    "debug-on-quit active\n[raise *Backtrace*]"))))))
          (concat (string-join parts " ") " ")))
 
 ;;;; Rendering
@@ -1339,7 +1349,8 @@ The default consults Sprite if its instance ID is bound; Sprite is optional."
 
 (defcustom hud-modeline-settings
   `((anzu-cons-mode-line-p . nil)
-    (frame-title-format . ,hud-modeline-frame-title-format))
+    (frame-title-format . ,hud-modeline-frame-title-format)
+    (mode-line-default-help-echo . nil))
   "Alist of `(SYMBOL . VALUE)' settings managed by `hud-modeline-mode'."
   :type '(alist :key-type symbol :value-type sexp)
   :group 'hud-modeline)
