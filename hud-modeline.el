@@ -223,6 +223,13 @@ Any combination of:
   :type '(choice integer (const :tag "Unlimited" nil))
   :group 'hud-modeline)
 
+(defcustom hud-modeline-position-excluded-modes
+  '(comint-mode compilation-mode)
+  "Major modes where the `position' segment is hidden.
+Matched with `derived-mode-p', so derived modes are also hidden."
+  :type '(repeat symbol)
+  :group 'hud-modeline)
+
 ;;;; Faces
 
 ;; Entries removed from the misc segment, so they can be shown (and toggled)
@@ -804,8 +811,12 @@ present in FROM-VAR."
  :key 'position
  :name "Position"
  :description "Line and column number"
- :body (concat (format-mode-line '(:propertize "%l:%c" face hud-modeline-position))
-               " "))
+ :body (unless (and hud-modeline-position-excluded-modes
+                    (apply #'derived-mode-p hud-modeline-position-excluded-modes))
+         (concat (format-mode-line
+                  '(:propertize "%l:%c" face hud-modeline-position)
+                  nil nil (current-buffer))
+                 " ")))
 
 ;; per-registration :max-width override no longer supported; use hud-modeline-misc-max-width
 (hud-modeline-add-segment

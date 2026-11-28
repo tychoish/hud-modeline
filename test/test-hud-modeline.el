@@ -930,3 +930,26 @@ not a flag-toggling command."
             (should (keymapp km))
             (should (eq (lookup-key km [mode-line mouse-1])
                         'diff-review-overview))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Position and minor-mode filtering
+
+(ert-deftest hud-modeline--position-hidden-in-comint-and-compilation ()
+  "The position segment is hidden in comint, compilation, and derived modes,
+while buffer-size remains visible."
+  (require 'comint)
+  (require 'compile)
+  (require 'shell)
+  (with-temp-buffer
+    (emacs-lisp-mode)
+    (should (stringp (hud-modeline--position-segment)))
+    (should (stringp (hud-modeline--buffer-size-segment))))
+  (dolist (mode '(comint-mode shell-mode compilation-mode grep-mode))
+    (with-temp-buffer
+      (funcall mode)
+      (should-not (hud-modeline--position-segment))
+      (should (stringp (hud-modeline--buffer-size-segment)))))
+  (with-temp-buffer
+    (comint-mode)
+    (let ((hud-modeline-position-excluded-modes nil))
+      (should (stringp (hud-modeline--position-segment))))))
