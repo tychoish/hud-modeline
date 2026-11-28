@@ -953,3 +953,28 @@ while buffer-size remains visible."
     (comint-mode)
     (let ((hud-modeline-position-excluded-modes nil))
       (should (stringp (hud-modeline--position-segment))))))
+
+(ert-deftest hud-modeline--minor-mode-alist-hides-visual-line-in-comint ()
+  "Visual line mode lighter is excluded in comint and derived modes only."
+  (require 'comint)
+  (require 'shell)
+  (let ((minor-mode-alist '((visual-line-mode " wr") (abbrev-mode " abb"))))
+    (with-temp-buffer
+      (emacs-lisp-mode)
+      (should (equal '("" minor-mode-alist)
+                     (hud-modeline--minor-mode-alist))))
+    (dolist (mode '(comint-mode shell-mode))
+      (with-temp-buffer
+        (funcall mode)
+        (let ((construct (hud-modeline--minor-mode-alist)))
+          (should (equal "" (car construct)))
+          (should-not (assq 'visual-line-mode (cdr construct)))
+          (should (assq 'abbrev-mode (cdr construct))))))
+    (unless noninteractive
+      (with-temp-buffer
+        (comint-mode)
+        (visual-line-mode 1)
+        (abbrev-mode 1)
+        (let ((rendered (substring-no-properties (hud-modeline--modes-segment))))
+          (should-not (string-search "wr" rendered))
+          (should (string-search "abb" rendered)))))))

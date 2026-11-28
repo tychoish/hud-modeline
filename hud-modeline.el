@@ -230,6 +230,15 @@ Matched with `derived-mode-p', so derived modes are also hidden."
   :type '(repeat symbol)
   :group 'hud-modeline)
 
+(defcustom hud-modeline-modes-excluded-minor-modes
+  '((comint-mode . (visual-line-mode)))
+  "Alist mapping major modes to minor modes hidden in `modes'.
+Each entry has the form `(MAJOR-MODE . MINOR-MODES)', where MAJOR-MODE
+is matched with `derived-mode-p' and MINOR-MODES is a list of minor
+mode symbols omitted from `minor-mode-alist'."
+  :type '(alist :key-type symbol :value-type (repeat symbol))
+  :group 'hud-modeline)
+
 ;;;; Faces
 
 ;; Entries removed from the misc segment, so they can be shown (and toggled)
@@ -781,6 +790,17 @@ present in FROM-VAR."
  :description "Visual spacer between buffer name and modes"
  :body " ")
 
+(defun hud-modeline--minor-mode-alist ()
+  "Return `minor-mode-alist' construct filtered for the current major mode."
+  (if-let* ((excluded (seq-mapcat (lambda (entry)
+                                    (when (derived-mode-p (car entry))
+                                      (cdr entry)))
+                                  hud-modeline-modes-excluded-minor-modes)))
+      (cons "" (seq-remove (lambda (entry)
+                             (and (consp entry) (memq (car entry) excluded)))
+                           minor-mode-alist))
+    '("" minor-mode-alist)))
+
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-left-segments
  :key 'modes
@@ -804,7 +824,8 @@ present in FROM-VAR."
                  major)))
          (format-mode-line
           `("%[" "(" ,major-display
-            ("" mode-line-process) ("" minor-mode-alist) "%n" ")" "%]"))))
+            ("" mode-line-process) ,(hud-modeline--minor-mode-alist) "%n" ")" "%]")
+          nil nil (current-buffer))))
 
 (hud-modeline-add-segment
  :segment-block 'hud-modeline-left-segments
